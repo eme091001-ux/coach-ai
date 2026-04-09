@@ -1,7 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquare, TrendingUp, UserCheck, Plus, Users } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
+import {
+  LayoutDashboard,
+  MessageSquare,
+  TrendingUp,
+  UserCheck,
+  Plus,
+  Users,
+  LogOut,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -14,6 +23,7 @@ const NAV = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   return (
     <aside className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
@@ -59,10 +69,43 @@ export default function Sidebar() {
         </Link>
       </nav>
 
-      <div className="px-4 py-4 border-t border-gray-100">
-        <p className="text-xs text-gray-400">自社内テナント</p>
-        <p className="text-xs font-medium text-gray-600 mt-0.5">tenant_001</p>
-      </div>
+      {/* User info */}
+      {session?.user && (
+        <div className="px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 min-w-0">
+            {session.user.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={session.user.image}
+                alt={session.user.name ?? ""}
+                width={28}
+                height={28}
+                className="w-7 h-7 rounded-full shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-medium shrink-0">
+                {session.user.name?.[0] ?? "U"}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-700 truncate">
+                {session.user.name}
+              </p>
+              <p className="text-[10px] text-gray-400 truncate">
+                {session.user.email}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <LogOut size={11} />
+            ログアウト
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
