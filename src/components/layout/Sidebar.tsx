@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquare, TrendingUp, UserCheck, Plus } from "lucide-react";
+import { LayoutDashboard, MessageSquare, TrendingUp, UserCheck, Plus, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { href: "/feedback", label: "フィードバック一覧", icon: MessageSquare },
   { href: "/growth", label: "成長トラッキング", icon: TrendingUp },
   { href: "/manager", label: "上司レビュー", icon: UserCheck },
+  { href: "/staff", label: "担当者管理", icon: Users },
 ];
 
 export default function Sidebar() {

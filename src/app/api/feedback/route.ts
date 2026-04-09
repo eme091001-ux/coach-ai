@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { FeedbackInput } from "@/types";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const client = new Anthropic();
 
@@ -49,6 +50,35 @@ const SYSTEM_PROMPT = `あなたはトップクラスの営業マネージャー
     "revenue": "<売上への影響>"
   }
 }`;
+
+async function notifySlack(
+  staffName: string,
+  score: number,
+  nextTheme: string,
+  feedbackId: string
+) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: [
+          "⚠️ 低スコアアラート",
+          `担当者: ${staffName}`,
+          `スコア: ${score}点`,
+          `次回テーマ: ${nextTheme}`,
+          `詳細: ${baseUrl}/feedback/${feedbackId}`,
+        ].join("\n"),
+      }),
+    });
+  } catch (e) {
+    console.error("Slack notification failed:", e);
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,14 +129,62 @@ ${body.transcript}
 
     const feedback = JSON.parse(cleanedText);
 
-    // 面談IDを生成して返す
-    const sessionId = `FB-${Date.now().toString().slice(-4)}`;
+    const sessionId = `FB-${Date.now().toString().slice(-6)}`;
+
+    // Save to Supabase if configured
+    if (isSupabaseConfigured()) {
+      // Look up staff_id by name or use provided staffId
+      let staffId = body.staffId ?? null;
+      if (!staffId && body.staffName) {
+        const { data: staffData } = await supabase
+          .from("staffs")
+          .select("id")
+          .eq("name", body.staffName)
+          .single();
+        staffId = staffData?.id ?? null;
+      }
+
+      const { error } = await supabase.from("feedback_sessions").insert({
+        id: sessionId,
+        tenant_id: "tenant_001",
+        meeting_date: body.meetingDate,
+        meeting_type: body.meetingType,
+        staff_id: staffId,
+        candidate_name: body.candidateName,
+        transcript: body.transcript,
+        total_score: feedback.totalScore,
+        summary: feedback.summary,
+        good_points: feedback.goodPoints,
+        improvements: feedback.improvements,
+        critical_points: feedback.criticalPoints,
+        script_example: feedback.scriptExample,
+        top_performer_gap: feedback.topPerformerGap,
+        next_theme: feedback.nextTheme,
+        manager_comment: feedback.managerComment,
+        scores: feedback.scores,
+        kpi_impact: feedback.kpiImpact,
+        status: "未確認",
+      });
+
+      if (error) console.error("Supabase save error:", error);
+    }
+
+    // Slack alert for low scores
+    if (feedback.totalScore <= 60) {
+      await notifySlack(
+        body.staffName,
+        feedback.totalScore,
+        feedback.nextTheme,
+        sessionId
+      );
+    }
 
     return NextResponse.json({
       id: sessionId,
       tenantId: "tenant_001",
       meetingDate: body.meetingDate,
       meetingType: body.meetingType,
+      staffId: body.staffId,
       staffName: body.staffName,
       candidateName: body.candidateName,
       transcript: body.transcript,

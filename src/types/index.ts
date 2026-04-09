@@ -31,11 +31,30 @@ export interface KpiImpact {
   revenue: string;      // 売上
 }
 
+export interface Staff {
+  id: string;
+  tenantId: string;
+  name: string;
+  experience: string;
+  role: string;
+  email: string;
+  avatarColor: string;
+  createdAt: string;
+}
+
+export interface ManagerComment {
+  id: string;
+  feedbackId: string;
+  comment: string;
+  createdAt: string;
+}
+
 export interface FeedbackSession {
   id: string;
   tenantId: string;
   meetingDate: string;
   meetingType: MeetingType;
+  staffId?: string;
   staffName: string;
   candidateName: string;
   transcript: string;
@@ -57,6 +76,7 @@ export interface FeedbackSession {
 export interface FeedbackInput {
   meetingDate: string;
   meetingType: MeetingType;
+  staffId?: string;
   staffName: string;
   staffExperience: string;
   candidateName: string;

@@ -1,4 +1,4 @@
-import { FeedbackSession } from "@/types";
+import { FeedbackSession, Staff } from "@/types";
 
 export const MOCK_SESSIONS: FeedbackSession[] = [
   {
@@ -150,4 +150,47 @@ export const MOCK_SESSIONS: FeedbackSession[] = [
   },
 ];
 
-export const STAFF_LIST = ["田中 美咲", "鈴木 健太", "佐藤 優", "松本 大輝"];
+export const MOCK_STAFF: Staff[] = [
+  {
+    id: "mock-staff-001",
+    tenantId: "tenant_001",
+    name: "田中 美咲",
+    experience: "3〜5年",
+    role: "シニアCA",
+    email: "tanaka@example.com",
+    avatarColor: "bg-teal-100 text-teal-800",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "mock-staff-002",
+    tenantId: "tenant_001",
+    name: "鈴木 健太",
+    experience: "3〜5年",
+    role: "シニアCA",
+    email: "suzuki@example.com",
+    avatarColor: "bg-blue-100 text-blue-800",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "mock-staff-003",
+    tenantId: "tenant_001",
+    name: "佐藤 優",
+    experience: "1〜2年",
+    role: "CA",
+    email: "sato@example.com",
+    avatarColor: "bg-amber-100 text-amber-800",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "mock-staff-004",
+    tenantId: "tenant_001",
+    name: "松本 大輝",
+    experience: "1〜2年",
+    role: "CA",
+    email: "matsumoto@example.com",
+    avatarColor: "bg-orange-100 text-orange-800",
+    createdAt: "2026-01-01T00:00:00Z",
+  },
+];
+
+export const STAFF_LIST = MOCK_STAFF.map((s) => s.name);
