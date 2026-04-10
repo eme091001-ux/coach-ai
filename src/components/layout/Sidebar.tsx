@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   LucideIcon,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchFeedbackSessions, fetchUserRole } from "@/lib/db";
@@ -72,7 +73,8 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "管理",
     items: [
-      { href: "/staff", label: "CA管理", icon: Users },
+      { href: "/ca-management", label: "CA管理", icon: Users },
+      { href: "/entry-management", label: "エントリー管理", icon: ClipboardList },
       { href: "/settings", label: "設定", icon: Settings },
     ],
   },

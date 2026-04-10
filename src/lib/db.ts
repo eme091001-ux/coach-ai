@@ -347,3 +347,189 @@ export async function fetchManagerComments(feedbackId: string): Promise<ManagerC
     createdAt: row.created_at as string,
   }));
 }
+
+// ── Candidates ────────────────────────────────────────────────────────────────
+
+export interface Candidate {
+  id: string;
+  caId: string;
+  caName?: string;
+  name: string;
+  reading: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
+  phase: string;
+  currentCompany?: string;
+  desiredJob?: string;
+  minOffer?: number;
+  maxOffer?: number;
+  nextAction?: string;
+  memo?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapDbCandidateToApp(row: Record<string, unknown>): Candidate {
+  return {
+    id: row.id as string,
+    caId: row.ca_id as string,
+    caName: row.ca_name as string | undefined,
+    name: row.name as string,
+    reading: row.reading as Candidate['reading'],
+    phase: row.phase as string,
+    currentCompany: row.current_company as string | undefined,
+    desiredJob: row.desired_job as string | undefined,
+    minOffer: row.min_offer as number | undefined,
+    maxOffer: row.max_offer as number | undefined,
+    nextAction: row.next_action as string | undefined,
+    memo: row.memo as string | undefined,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
+export async function fetchCandidates(caId: string): Promise<Candidate[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('*')
+    .eq('ca_id', caId)
+    .order('reading', { ascending: true });
+  if (error || !data) return [];
+  return data.map(mapDbCandidateToApp);
+}
+
+export async function addCandidate(
+  candidate: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<Candidate | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('candidates')
+    .insert({
+      ca_id: candidate.caId,
+      ca_name: candidate.caName ?? null,
+      name: candidate.name,
+      reading: candidate.reading,
+      phase: candidate.phase,
+      current_company: candidate.currentCompany ?? null,
+      desired_job: candidate.desiredJob ?? null,
+      min_offer: candidate.minOffer ?? null,
+      max_offer: candidate.maxOffer ?? null,
+      next_action: candidate.nextAction ?? null,
+      memo: candidate.memo ?? null,
+    })
+    .select()
+    .single();
+  if (error || !data) return null;
+  return mapDbCandidateToApp(data);
+}
+
+export async function updateCandidate(
+  id: string,
+  updates: Partial<Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'>>
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (updates.name !== undefined) patch.name = updates.name;
+  if (updates.reading !== undefined) patch.reading = updates.reading;
+  if (updates.phase !== undefined) patch.phase = updates.phase;
+  if (updates.currentCompany !== undefined) patch.current_company = updates.currentCompany;
+  if (updates.desiredJob !== undefined) patch.desired_job = updates.desiredJob;
+  if (updates.minOffer !== undefined) patch.min_offer = updates.minOffer;
+  if (updates.maxOffer !== undefined) patch.max_offer = updates.maxOffer;
+  if (updates.nextAction !== undefined) patch.next_action = updates.nextAction;
+  if (updates.memo !== undefined) patch.memo = updates.memo;
+  const { error } = await supabase.from('candidates').update(patch).eq('id', id);
+  return !error;
+}
+
+export async function deleteCandidate(id: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase.from('candidates').delete().eq('id', id);
+  return !error;
+}
+
+// ── Entry Requests ────────────────────────────────────────────────────────────
+
+export interface EntryRequest {
+  id: string;
+  caId: string;
+  caName?: string;
+  candidateName: string;
+  companyName: string;
+  companyId?: string;
+  media?: string[];
+  resumeUrl?: string;
+  careerUrl?: string;
+  recommendation?: string;
+  interviewDates?: string[];
+  status: 'pending' | 'entered' | 'adjusting' | 'confirmed' | 'stopped';
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapDbEntryToApp(row: Record<string, unknown>): EntryRequest {
+  return {
+    id: row.id as string,
+    caId: row.ca_id as string,
+    caName: row.ca_name as string | undefined,
+    candidateName: row.candidate_name as string,
+    companyName: row.company_name as string,
+    companyId: row.company_id as string | undefined,
+    media: row.media as string[] | undefined,
+    resumeUrl: row.resume_url as string | undefined,
+    careerUrl: row.career_url as string | undefined,
+    recommendation: row.recommendation as string | undefined,
+    interviewDates: row.interview_dates as string[] | undefined,
+    status: (row.status as EntryRequest['status']) ?? 'pending',
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
+export async function fetchEntryRequests(caId?: string): Promise<EntryRequest[]> {
+  if (!isSupabaseConfigured()) return [];
+  let query = supabase
+    .from('entry_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (caId) query = (query as typeof query).eq('ca_id', caId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map(mapDbEntryToApp);
+}
+
+export async function addEntryRequest(
+  entry: Omit<EntryRequest, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('entry_requests')
+    .insert({
+      ca_id: entry.caId,
+      ca_name: entry.caName ?? null,
+      candidate_name: entry.candidateName,
+      company_name: entry.companyName,
+      company_id: entry.companyId ?? null,
+      media: entry.media ?? [],
+      resume_url: entry.resumeUrl ?? null,
+      career_url: entry.careerUrl ?? null,
+      recommendation: entry.recommendation ?? null,
+      interview_dates: entry.interviewDates ?? [],
+      status: entry.status ?? 'pending',
+    })
+    .select('id')
+    .single();
+  if (error || !data) return null;
+  return data.id as string;
+}
+
+export async function updateEntryStatus(
+  id: string,
+  status: EntryRequest['status']
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase
+    .from('entry_requests')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  return !error;
+}
