@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Plus,
+  FileText,
   TrendingUp,
   BarChart2,
   Users,
@@ -58,6 +59,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { href: "/", label: "ダッシュボード", icon: LayoutDashboard, exact: true },
       { href: "/feedback", label: "面談一覧", icon: MessageSquare, badge: true },
       { href: "/new", label: "新規面談", icon: Plus, exact: true },
+      { href: "/documents", label: "書類作成", icon: FileText },
     ],
   },
   {
