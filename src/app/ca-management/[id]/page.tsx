@@ -72,6 +72,13 @@ const DESIRED_JOB_OPTIONS = [
   "企画","人事・採用","経理・財務","コンサルタント","マネージャー","その他",
 ];
 
+const CURRENT_INDUSTRY_OPTIONS = [
+  "未就業","保育士・幼稚園教諭","介護・福祉","営業","販売・接客","施工管理・建築",
+  "ITエンジニア","電気・機械エンジニア","事務・バックオフィス","マーケティング・企画",
+  "人事・採用","経理・財務","コンサルタント","教育・講師","医療・看護","飲食・サービス",
+  "物流・ドライバー","その他",
+];
+
 // ── Sales calculation ─────────────────────────────────────────────────────────
 function calcSales(candidates: Candidate[]) {
   let minS = 0, maxS = 0;
@@ -861,7 +868,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   const [editing, setEditing] = useState<Candidate | null>(null);
   const [saving, setSaving] = useState(false);
   const [candidateForm, setCandidateForm] = useState({
-    name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '',
+    name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '',
     age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] as string[],
   });
   const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
@@ -872,7 +879,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   }, [id]);
 
   const openAdd = () => {
-    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
     setEditing(null);
     setShowModal(true);
   };
@@ -882,7 +889,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
       name: c.name,
       phase: c.phase,
       nextAction: c.nextAction ?? '',
-      currentJob: c.currentCompany ?? '',
+      currentIndustry: c.currentCompany ?? '',
       desiredJob: c.desiredJob ?? '',
       memo: c.memo ?? '',
       age: c.age !== undefined ? String(c.age) : '',
@@ -900,7 +907,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   const closeModal = () => {
     setShowModal(false);
     setEditing(null);
-    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
   };
 
   const handleModalSave = async () => {
@@ -914,7 +921,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
         reading,
         phase: candidateForm.phase,
         nextAction: candidateForm.nextAction || undefined,
-        currentCompany: candidateForm.currentJob || undefined,
+        currentCompany: candidateForm.currentIndustry || undefined,
         desiredJob: candidateForm.desiredJob || undefined,
         memo: candidateForm.memo || undefined,
         targetCompanies: editing?.targetCompanies ?? [],
@@ -1065,17 +1072,14 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
 
-            {/* 現職 / 現職種 */}
+            {/* 現職業種 / 現職種 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職</label>
-                <input
-                  type="text"
-                  value={candidateForm.currentJob}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, currentJob: e.target.value }))}
-                  placeholder="株式会社○○"
-                  style={inpStyle}
-                />
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職業種</label>
+                <select value={candidateForm.currentIndustry} onChange={(e) => setCandidateForm(prev => ({ ...prev, currentIndustry: e.target.value }))} style={inpStyle}>
+                  <option value="">選択...</option>
+                  {CURRENT_INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職種</label>

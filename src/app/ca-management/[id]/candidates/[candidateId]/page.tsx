@@ -3,7 +3,7 @@ import { useState, useEffect, use, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  fetchCandidateById, fetchStaffById, updateCandidate,
+  fetchCandidateById, fetchCandidates, fetchStaffById, updateCandidate,
   fetchFeedbackSessionsByCandidateName, fetchFeedbackSessionsByCandidateId,
   fetchDocuments, fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
   Candidate, TargetCompany, CandidateDocument, EntryRequest,
@@ -888,9 +888,22 @@ function CandidateDetailInner({ caId, candidateId }: { caId: string; candidateId
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "basic");
 
   useEffect(() => {
-    Promise.all([fetchCandidateById(candidateId), fetchStaffById(caId)]).then(([c, s]) => {
-      setCandidate(c);
+    const load = async () => {
+      const [c, s] = await Promise.all([fetchCandidateById(candidateId), fetchStaffById(caId)]);
+      if (!c) {
+        // Fallback: fetchCandidateById returned null — try scanning the CA's full list
+        console.warn('fetchCandidateById returned null for id:', candidateId, '— falling back to fetchCandidates');
+        const all = await fetchCandidates(caId);
+        const found = all.find((cand) => cand.id === candidateId) ?? null;
+        setCandidate(found);
+      } else {
+        setCandidate(c);
+      }
       setStaff(s);
+      setLoading(false);
+    };
+    load().catch((err) => {
+      console.error('CandidateDetailInner load error:', err);
       setLoading(false);
     });
   }, [candidateId, caId]);

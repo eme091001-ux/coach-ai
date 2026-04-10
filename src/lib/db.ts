@@ -433,7 +433,11 @@ export async function fetchCandidateById(id: string): Promise<Candidate | null> 
     .select('*')
     .eq('id', id)
     .single();
-  if (error || !data) return null;
+  if (error) {
+    console.error('fetchCandidateById error:', error.message, '| code:', error.code, '| id:', id);
+    return null;
+  }
+  if (!data) return null;
   return mapDbCandidateToApp(data);
 }
 
