@@ -6,6 +6,8 @@ export type MeetingType =
   | "法人営業"
   | "商談";
 
+export type InterviewPhase = "1次面談" | "2次面談" | "求人提案" | "内定後フォロー";
+
 export type FeedbackStatus =
   | "未確認"
   | "確認済"
@@ -79,6 +81,7 @@ export interface FeedbackSession {
   scoreDetails?: ScoreDetail[];
   totalBasis?: string;
   totalImprovement?: string;
+  interviewPhase?: InterviewPhase;
   kpiImpact: KpiImpact;
   status: FeedbackStatus;
   createdAt: string;

@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { MOCK_SESSIONS, MOCK_STAFF } from './mockData';
-import { FeedbackSession, Staff, MeetingType, FeedbackStatus, ManagerComment } from '@/types';
+import { FeedbackSession, Staff, MeetingType, FeedbackStatus, ManagerComment, InterviewPhase } from '@/types';
 
 function mapDbSessionToApp(row: Record<string, unknown>): FeedbackSession {
   const staffsData = row.staffs as Record<string, unknown> | null;
@@ -30,6 +30,7 @@ function mapDbSessionToApp(row: Record<string, unknown>): FeedbackSession {
       acceptance: '', application: '', interview: '', offer: '', revenue: '',
     },
     status: ((row.status as FeedbackStatus)) ?? '未確認',
+    interviewPhase: (row.interview_phase as InterviewPhase) ?? undefined,
     createdAt: row.created_at as string,
   };
 }
