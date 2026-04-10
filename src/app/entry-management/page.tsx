@@ -280,8 +280,12 @@ function CandidateManagementTab({
     ? entries
     : entries.filter((e) => e.status === statusFilter);
 
-  const scrollToAlert = () => {
-    alertRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToFirstStalled = () => {
+    // Find first stalled entry in the current filtered list
+    const firstStalled = filtered.find(isStalled) ?? stalled[0];
+    if (!firstStalled) return;
+    const el = document.getElementById(`entry-${firstStalled.id}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   return (
@@ -332,7 +336,7 @@ function CandidateManagementTab({
             background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10,
             padding: "12px 16px", marginBottom: 18, cursor: "pointer",
           }}
-          onClick={scrollToAlert}
+          onClick={scrollToFirstStalled}
         >
           <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>

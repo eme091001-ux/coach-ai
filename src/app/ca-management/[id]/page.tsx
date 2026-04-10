@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import {
   fetchStaffById, fetchCandidates, addCandidate, updateCandidate, deleteCandidate,
   fetchFeedbackSessionsFiltered, fetchDocuments, fetchEntryRequests, addEntryRequest,
+  updateEntryStatus,
   fetchDailyReports, addDailyReport, fetchMonthlyForecast, upsertMonthlyForecast,
-  Candidate, CandidateDocument, EntryRequest, DailyReport, MonthlyForecast,
+  Candidate, CandidateDocument, EntryRequest, DailyReport,
 } from "@/lib/db";
 import { Staff, FeedbackSession } from "@/types";
 import {
   ChevronLeft, Plus, Trash2, Edit2, X, Save, FileText, Briefcase,
-  Target, FolderOpen, ClipboardList, TrendingUp, ChevronDown, ChevronUp,
+  FolderOpen, ClipboardList, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -36,11 +37,12 @@ const READING_STYLE: Record<string, { bg: string; text: string }> = {
 };
 
 const ENTRY_STATUS: Record<string, { label: string; bg: string; text: string }> = {
-  pending:   { label: "依頼中",          bg: "#FEF9C3", text: "#854D0E" },
-  entered:   { label: "エントリー済",     bg: "#DBEAFE", text: "#1D4ED8" },
-  adjusting: { label: "日程調整中",       bg: "#FED7AA", text: "#92400E" },
-  confirmed: { label: "確定面接待ち",     bg: "#D1FAE5", text: "#065F46" },
-  stopped:   { label: "進んでいない",     bg: "#FEE2E2", text: "#991B1B" },
+  pending:   { label: "依頼中",        bg: "#FEF9C3", text: "#854D0E" },
+  entered:   { label: "エントリー済",  bg: "#E8F2FC", text: "#1A5BA6" },
+  adjusting: { label: "日程調整中",    bg: "#FAEEDA", text: "#854F0B" },
+  confirmed: { label: "確定面接待ち",  bg: "#DCFCE7", text: "#166534" },
+  done:      { label: "面接完了",      bg: "#F1F0E8", text: "#5F5E5A" },
+  stopped:   { label: "進んでいない",  bg: "#FEE2E2", text: "#991B1B" },
 };
 
 // ── Sales calculation ─────────────────────────────────────────────────────────
@@ -550,6 +552,42 @@ function EntryModal({
   );
 }
 
+// ── Entry status dropdown (inline) ───────────────────────────────────────────
+function EntryStatusDropdown({ entry, onUpdate }: {
+  entry: EntryRequest;
+  onUpdate: (id: string, status: EntryRequest["status"]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const st = ENTRY_STATUS[entry.status] ?? ENTRY_STATUS.pending;
+  const handleSelect = async (val: EntryRequest["status"]) => {
+    setOpen(false);
+    if (val === entry.status) return;
+    setBusy(true);
+    await updateEntryStatus(entry.id, val);
+    onUpdate(entry.id, val);
+    setBusy(false);
+  };
+  return (
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <button onClick={() => setOpen((o) => !o)} disabled={busy}
+        style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: st.bg, color: st.text, border: "none", cursor: "pointer" }}>
+        {st.label} <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "100%", right: 0, zIndex: 20, marginTop: 4, background: "#fff", border: "1px solid #C8DFF5", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 140, overflow: "hidden" }}>
+          {Object.entries(ENTRY_STATUS).map(([val, { label }]) => (
+            <button key={val} onClick={() => handleSelect(val as EntryRequest["status"])}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 12px", fontSize: 12, color: "#0D2B5E", background: val === entry.status ? "#F0F7FF" : "transparent", border: "none", cursor: "pointer", fontWeight: val === entry.status ? 600 : 400 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tab 4: Entry Requests ─────────────────────────────────────────────────────
 function EntryRequestsTab({ caId, caName, candidates }: { caId: string; caName: string; candidates: Candidate[] }) {
   const [entries, setEntries] = useState<EntryRequest[]>([]);
@@ -561,6 +599,9 @@ function EntryRequestsTab({ caId, caName, candidates }: { caId: string; caName: 
   }, [caId]);
 
   const handleSaved = (e: EntryRequest) => setEntries((prev) => [e, ...prev]);
+  const handleUpdate = (id: string, status: EntryRequest["status"]) => {
+    setEntries((prev) => prev.map((e) => e.id === id ? { ...e, status } : e));
+  };
 
   return (
     <div>
@@ -581,17 +622,23 @@ function EntryRequestsTab({ caId, caName, candidates }: { caId: string; caName: 
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {entries.map((e) => {
-            const st = ENTRY_STATUS[e.status] ?? ENTRY_STATUS.pending;
+            const days = Math.floor((Date.now() - new Date(e.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+            const stalled = e.status === "stopped" || ((e.status === "pending" || e.status === "entered") && days > 7);
             return (
-              <div key={e.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+              <div key={e.id} style={{ background: stalled ? "#FFFBF0" : "#fff", border: `1px solid ${stalled ? "#FCA5A5" : "#C8DFF5"}`, borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 3 }}>{e.candidateName} → {e.companyName}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 3 }}>
+                    {e.candidateName}
+                    <span style={{ margin: "0 6px", color: "#C8DFF5" }}>→</span>
+                    {e.companyName}
+                    {stalled && <span style={{ marginLeft: 8, fontSize: 10, color: "#991B1B", fontWeight: 600 }}>⚠ 停滞</span>}
+                  </p>
                   <p style={{ fontSize: 11, color: "#9CAAB8" }}>
-                    {new Date(e.createdAt).toLocaleDateString("ja-JP")}
+                    {new Date(e.createdAt).toLocaleDateString("ja-JP")} · {days}日経過
                     {e.media?.length ? ` · ${e.media.join(", ")}` : ""}
                   </p>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 12, background: st.bg, color: st.text, flexShrink: 0 }}>{st.label}</span>
+                <EntryStatusDropdown entry={e} onUpdate={handleUpdate} />
               </div>
             );
           })}
@@ -614,7 +661,6 @@ function DailyReportsTab({ caId, caName, candidates }: { caId: string; caName: s
   const todayStr = now.toISOString().slice(0, 10);
 
   const [reports, setReports] = useState<DailyReport[]>([]);
-  const [forecast, setForecast] = useState<MonthlyForecast | null>(null);
   const [loadingReports, setLoadingReports] = useState(true);
   const [viewMonth, setViewMonth] = useState(`${curYear}-${String(curMonth).padStart(2, "0")}`);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -643,7 +689,6 @@ function DailyReportsTab({ caId, caName, candidates }: { caId: string; caName: s
     ]).then(([rpts, fc]) => {
       setReports(rpts);
       if (fc) {
-        setForecast(fc);
         setFcForm({
           forecastMin: fc.forecastMin?.toString() ?? "",
           forecastMax: fc.forecastMax?.toString() ?? "",
