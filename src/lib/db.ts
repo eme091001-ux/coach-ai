@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { MOCK_SESSIONS, MOCK_STAFF } from './mockData';
-import { FeedbackSession, Staff, MeetingType, FeedbackStatus, ManagerComment, InterviewPhase } from '@/types';
+import { FeedbackSession, Staff, MeetingType, FeedbackStatus, ManagerComment, InterviewPhase, CAProfile } from '@/types';
 
 function mapDbSessionToApp(row: Record<string, unknown>): FeedbackSession {
   const staffsData = row.staffs as Record<string, unknown> | null;
@@ -123,6 +123,99 @@ export async function fetchFeedbackByStaffId(staffId: string, staffName?: string
   if (error || !data) return [];
 
   return data.map(mapDbSessionToApp);
+}
+
+export async function fetchFeedbackSessionsFiltered(
+  staffId?: string,
+  interviewPhase?: string
+): Promise<FeedbackSession[]> {
+  const applyFilter = (sessions: FeedbackSession[]) => {
+    let result = sessions;
+    if (staffId) {
+      result = result.filter(
+        (s) => s.staffId === staffId || s.staffName === staffId
+      );
+    }
+    if (interviewPhase) {
+      result = result.filter((s) => s.interviewPhase === interviewPhase);
+    }
+    return result;
+  };
+
+  if (!isSupabaseConfigured()) return applyFilter(MOCK_SESSIONS);
+
+  let query = supabase
+    .from('feedback_sessions')
+    .select('*, staffs(name)')
+    .order('created_at', { ascending: false });
+
+  if (staffId) query = (query as typeof query).eq('staff_id', staffId);
+  if (interviewPhase) query = (query as typeof query).eq('interview_phase', interviewPhase);
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return applyFilter(MOCK_SESSIONS);
+  return data.map(mapDbSessionToApp);
+}
+
+export async function fetchCAProfiles(): Promise<CAProfile[]> {
+  if (!isSupabaseConfigured()) {
+    return MOCK_STAFF.map((s) => ({
+      id: s.id,
+      name: s.name,
+      role: s.role,
+      email: s.email,
+    }));
+  }
+
+  // Try profiles table first
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, name, role, email')
+    .in('role', ['ca', 'manager', 'admin'])
+    .order('name');
+
+  if (profiles && profiles.length > 0) {
+    return profiles.map((p) => ({
+      id: p.id as string,
+      name: p.name as string,
+      role: p.role as string,
+      email: p.email as string | undefined,
+    }));
+  }
+
+  // Fall back to staffs table
+  const { data: staffs } = await supabase
+    .from('staffs')
+    .select('id, name, role, email')
+    .order('name');
+
+  if (staffs && staffs.length > 0) {
+    return staffs.map((s) => ({
+      id: s.id as string,
+      name: s.name as string,
+      role: (s.role as string) ?? 'ca',
+      email: s.email as string | undefined,
+    }));
+  }
+
+  return MOCK_STAFF.map((s) => ({
+    id: s.id,
+    name: s.name,
+    role: s.role,
+    email: s.email,
+  }));
+}
+
+export async function fetchUserRole(
+  email: string
+): Promise<'admin' | 'manager' | 'ca'> {
+  if (!isSupabaseConfigured()) return 'admin';
+  const { data } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('email', email)
+    .single();
+  return (data?.role as 'admin' | 'manager' | 'ca') ?? 'admin';
 }
 
 export async function fetchManagerComments(feedbackId: string): Promise<ManagerComment[]> {

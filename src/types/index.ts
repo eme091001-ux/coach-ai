@@ -87,6 +87,13 @@ export interface FeedbackSession {
   createdAt: string;
 }
 
+export interface CAProfile {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+}
+
 export interface FeedbackInput {
   meetingDate: string;
   meetingType: MeetingType;
