@@ -159,7 +159,11 @@ export default function NewFeedbackPage() {
       });
       if (!res.ok) throw new Error("生成失敗");
       const data = await res.json();
-      router.push(`/feedback/${data.id}`);
+      if (form.candidateId && selectedCandidate?.caId) {
+        router.push(`/ca-management/${selectedCandidate.caId}/candidates/${form.candidateId}?tab=feedback`);
+      } else {
+        router.push(`/feedback/${data.id}`);
+      }
     } catch {
       setError(
         "フィードバックの生成に失敗しました。APIキーを確認してください。"

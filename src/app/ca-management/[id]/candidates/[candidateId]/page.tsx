@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, useEffect, use, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  fetchCandidateById, fetchStaffById, updateCandidate, fetchFeedbackSessionsByCandidateName,
+  fetchCandidateById, fetchStaffById, updateCandidate,
+  fetchFeedbackSessionsByCandidateName, fetchFeedbackSessionsByCandidateId,
   fetchDocuments, fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
   Candidate, TargetCompany, CandidateDocument, EntryRequest,
 } from "@/lib/db";
@@ -61,9 +62,6 @@ const ENTRY_STATUS: Record<string, { label: string; bg: string; text: string }> 
   done:      { label: "面接完了",      bg: "#F1F0E8", text: "#5F5E5A" },
   stopped:   { label: "進んでいない",  bg: "#FEE2E2", text: "#991B1B" },
 };
-
-const SCORE_COLORS = (s: number) =>
-  s >= 80 ? "#166534" : s >= 60 ? "#854D0E" : "#991B1B";
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 const inp = (extra?: React.CSSProperties): React.CSSProperties => ({
@@ -165,7 +163,7 @@ function BasicInfoTab({ candidate, caId, onUpdated }: { candidate: Candidate; ca
       ["希望職種", (candidate.desiredJobs ?? []).join("・") || "—"],
       ["ネクストアクション", candidate.nextAction ?? "—"],
     ];
-    if (needsOffer || ["A","B","C"].includes(candidate.reading)) {
+    if (["A","B","C"].includes(candidate.reading)) {
       rows.push(["売上見込み", `${fmt(candidate.minOffer)}〜${fmt(candidate.maxOffer)}`]);
     }
     return (
@@ -307,48 +305,111 @@ function BasicInfoTab({ candidate, caId, onUpdated }: { candidate: Candidate; ca
   );
 }
 
-// ── Tab 2: Feedback History ───────────────────────────────────────────────────
-function FeedbackHistoryTab({ candidateName }: { candidateName: string }) {
+// ── Tab 2: Feedback History (実装⑦) ──────────────────────────────────────────
+function FeedbackHistoryTab({
+  candidateId, candidateName, caId,
+}: { candidateId: string; candidateName: string; caId: string }) {
   const [sessions, setSessions] = useState<FeedbackSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchFeedbackSessionsByCandidateName(candidateName).then((ss) => { setSessions(ss); setLoading(false); });
-  }, [candidateName]);
+    Promise.all([
+      fetchFeedbackSessionsByCandidateId(candidateId),
+      fetchFeedbackSessionsByCandidateName(candidateName),
+    ]).then(([byId, byName]) => {
+      const merged = [...byId];
+      for (const s of byName) {
+        if (!merged.find((m) => m.id === s.id)) merged.push(s);
+      }
+      merged.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setSessions(merged);
+      setLoading(false);
+    });
+  }, [candidateId, candidateName]);
 
   const scoreColor = (s: number) => s >= 80 ? "#166534" : s >= 60 ? "#854D0E" : "#991B1B";
   const scoreBg = (s: number) => s >= 80 ? "#DCFCE7" : s >= 60 ? "#FEF9C3" : "#FEE2E2";
 
+  const extractTitle = (point: string) => {
+    const colonIdx = point.indexOf("：");
+    return colonIdx > 0 ? point.slice(0, colonIdx) : point.slice(0, 16);
+  };
+
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>;
-  if (sessions.length === 0) return (
-    <div style={{ textAlign: "center", padding: 60, background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12 }}>
-      <p style={{ fontSize: 14, color: "#9CAAB8" }}>面談記録がありません</p>
-    </div>
-  );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {sessions.map((s) => (
-        <Link key={s.id} href={`/feedback/${s.id}`} style={{ textDecoration: "none" }}>
-          <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", transition: "box-shadow 0.2s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 12px rgba(59,143,212,0.12)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 600, background: "#EBF5FF", color: "#1A5BA6", padding: "2px 8px", borderRadius: 8 }}>{s.meetingType}</span>
-                <span style={{ fontSize: 11, color: "#9CAAB8" }}>{s.meetingDate}</span>
-                {s.staffName && <span style={{ fontSize: 11, color: "#9CAAB8" }}>担当: {s.staffName}</span>}
-              </div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E" }}>{s.summary || "（サマリなし）"}</p>
-            </div>
-            <div style={{ textAlign: "center", flexShrink: 0 }}>
-              <span style={{ fontSize: 18, fontWeight: 800, color: scoreColor(s.totalScore), background: scoreBg(s.totalScore), padding: "4px 12px", borderRadius: 10, display: "block" }}>{s.totalScore}</span>
-              <span style={{ fontSize: 9, color: "#9CAAB8" }}>スコア</span>
-            </div>
-            <ExternalLink size={14} style={{ color: "#9CAAB8", flexShrink: 0 }} />
-          </div>
+    <div>
+      {/* 新規面談ボタン */}
+      <div style={{ marginBottom: 14 }}>
+        <Link href={`/new?candidate_id=${candidateId}&candidate_name=${encodeURIComponent(candidateName)}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", textDecoration: "none" }}>
+          <Plus size={14} /> 新規面談を登録する
         </Link>
-      ))}
+      </div>
+
+      {sessions.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12 }}>
+          <p style={{ fontSize: 14, color: "#9CAAB8", marginBottom: 8 }}>面談記録がありません</p>
+          <Link href={`/new?candidate_id=${candidateId}&candidate_name=${encodeURIComponent(candidateName)}`}
+            style={{ fontSize: 12, color: "#1A5BA6", textDecoration: "none", fontWeight: 600 }}>
+            最初の面談を登録する →
+          </Link>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {sessions.map((s) => (
+            <div key={s.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, overflow: "hidden" }}>
+              {/* Card header */}
+              <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, background: "#EBF5FF", color: "#1A5BA6", padding: "2px 8px", borderRadius: 8 }}>{s.meetingType}</span>
+                    {s.interviewPhase && (
+                      <span style={{ fontSize: 11, fontWeight: 600, background: "#F7FAFF", color: "#4A6FA5", padding: "2px 8px", borderRadius: 8, border: "1px solid #C8DFF5" }}>{s.interviewPhase}</span>
+                    )}
+                    <span style={{ fontSize: 11, color: "#9CAAB8" }}>{s.meetingDate}</span>
+                    {s.staffName && <span style={{ fontSize: 11, color: "#9CAAB8" }}>担当: {s.staffName}</span>}
+                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 8 }}>{s.summary || "（サマリなし）"}</p>
+
+                  {/* Good points */}
+                  {s.goodPoints.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
+                      {s.goodPoints.slice(0, 3).map((gp, i) => (
+                        <span key={i} style={{ fontSize: 10, fontWeight: 600, background: "#DCFCE7", color: "#166534", padding: "2px 8px", borderRadius: 8 }}>
+                          ✓ {extractTitle(gp)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Improvements */}
+                  {s.improvements.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {s.improvements.slice(0, 2).map((imp, i) => (
+                        <span key={i} style={{ fontSize: 10, fontWeight: 600, background: "#FEF9C3", color: "#854D0E", padding: "2px 8px", borderRadius: 8 }}>
+                          △ {extractTitle(imp)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Score */}
+                <div style={{ textAlign: "center", flexShrink: 0 }}>
+                  <span style={{ fontSize: 24, fontWeight: 900, color: scoreColor(s.totalScore), background: scoreBg(s.totalScore), padding: "6px 14px", borderRadius: 12, display: "block", lineHeight: 1 }}>{s.totalScore}</span>
+                  <span style={{ fontSize: 9, color: "#9CAAB8", marginTop: 2, display: "block" }}>総合スコア</span>
+                </div>
+              </div>
+              {/* Footer */}
+              <div style={{ borderTop: "1px solid #EBF5FF", padding: "8px 16px", display: "flex", justifyContent: "flex-end" }}>
+                <Link href={`/feedback/${s.id}`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 600, color: "#1A5BA6", textDecoration: "none" }}>
+                  詳細を見る <ExternalLink size={11} />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -444,7 +505,7 @@ function TargetCompaniesTab({
   const generateRecommendation = async (company: TargetCompany) => {
     setGeneratingId(company.id);
     try {
-      const feedbackSummaries: string[] = []; // can enhance with actual data
+      const feedbackSummaries: string[] = [];
       const res = await fetch("/api/candidates/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -580,29 +641,76 @@ function TargetCompaniesTab({
   );
 }
 
-// ── Tab 5: Entry Requests ─────────────────────────────────────────────────────
-function EntryRequestsTab({ candidate, caId, caName }: { candidate: Candidate; caId: string; caName: string }) {
+// ── Tab 5: Entry Requests (実装⑧) ────────────────────────────────────────────
+interface EntryForm {
+  companyName: string;
+  companyId: string;
+  recommendation: string;
+  mediaInput: string;
+  mediaTags: string[];
+  date1: string; time1: string;
+  date2: string; time2: string;
+  date3: string; time3: string;
+}
+
+function EntryRequestsTab({
+  candidate, caId, caName, targetCompanies,
+}: {
+  candidate: Candidate; caId: string; caName: string; targetCompanies: TargetCompany[];
+}) {
   const [entries, setEntries] = useState<EntryRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [companyName, setCompanyName] = useState("");
-  const [media, setMedia] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState<EntryForm>({
+    companyName: "", companyId: "", recommendation: "",
+    mediaInput: "", mediaTags: [],
+    date1: "", time1: "10:00",
+    date2: "", time2: "10:00",
+    date3: "", time3: "10:00",
+  });
 
   useEffect(() => {
     fetchEntryRequestsByCandidateId(candidate.id).then((es) => { setEntries(es); setLoading(false); });
   }, [candidate.id]);
 
-  const handleAdd = async () => {
-    if (!companyName.trim()) return;
+  const handleCompanySelect = (companyId: string) => {
+    const co = targetCompanies.find((c) => c.id === companyId);
+    if (!co) { setForm((f) => ({ ...f, companyName: "", companyId: "", recommendation: "" })); return; }
+    setForm((f) => ({ ...f, companyName: co.name, companyId: co.companyId ?? co.id, recommendation: co.recommendation ?? "" }));
+  };
+
+  const addMediaTag = () => {
+    const tag = form.mediaInput.trim();
+    if (tag && !form.mediaTags.includes(tag)) {
+      setForm((f) => ({ ...f, mediaTags: [...f.mediaTags, tag], mediaInput: "" }));
+    }
+  };
+
+  const removeMediaTag = (tag: string) =>
+    setForm((f) => ({ ...f, mediaTags: f.mediaTags.filter((t) => t !== tag) }));
+
+  const buildDates = () => {
+    const dates: string[] = [];
+    if (form.date1) dates.push(`${form.date1} ${form.time1}`);
+    if (form.date2) dates.push(`${form.date2} ${form.time2}`);
+    if (form.date3) dates.push(`${form.date3} ${form.time3}`);
+    return dates;
+  };
+
+  const handleSubmit = async () => {
+    if (!form.companyName.trim()) return;
     setSubmitting(true);
     try {
       const id = await addEntryRequest({
         caId, caName,
         candidateId: candidate.id,
         candidateName: candidate.name,
-        companyName,
-        media: media ? [media] : [],
+        companyName: form.companyName,
+        companyId: form.companyId || undefined,
+        media: form.mediaTags,
+        recommendation: form.recommendation || undefined,
+        interviewDates: buildDates(),
         status: "pending",
       });
       const newEntry: EntryRequest = {
@@ -610,14 +718,18 @@ function EntryRequestsTab({ candidate, caId, caName }: { candidate: Candidate; c
         caId, caName,
         candidateId: candidate.id,
         candidateName: candidate.name,
-        companyName,
-        media: media ? [media] : [],
+        companyName: form.companyName,
+        companyId: form.companyId || undefined,
+        media: form.mediaTags,
+        recommendation: form.recommendation || undefined,
+        interviewDates: buildDates(),
         status: "pending",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
       setEntries((prev) => [newEntry, ...prev]);
-      setCompanyName(""); setMedia(""); setShowForm(false);
+      setForm({ companyName: "", companyId: "", recommendation: "", mediaInput: "", mediaTags: [], date1: "", time1: "10:00", date2: "", time2: "10:00", date3: "", time3: "10:00" });
+      setShowForm(false);
     } finally { setSubmitting(false); }
   };
 
@@ -638,19 +750,80 @@ function EntryRequestsTab({ candidate, caId, caName }: { candidate: Candidate; c
       </div>
 
       {showForm && (
-        <div style={{ background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 10, padding: 18, marginBottom: 14 }}>
-          <p style={{ fontWeight: 700, fontSize: 13, color: "#0D2B5E", marginBottom: 12 }}>エントリー依頼を追加</p>
-          <FRow label="企業名 *">
-            <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="株式会社○○" style={inp()} />
+        <div style={{ background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 14 }}>
+          <p style={{ fontWeight: 700, fontSize: 14, color: "#0D2B5E", marginBottom: 16 }}>エントリー依頼を作成</p>
+
+          {/* Read-only fields */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div>
+              <Lbl>求職者名</Lbl>
+              <div style={{ ...inp(), background: "#F0F4FA", color: "#9CAAB8" }}>{candidate.name}</div>
+            </div>
+            <div>
+              <Lbl>担当CA</Lbl>
+              <div style={{ ...inp(), background: "#F0F4FA", color: "#9CAAB8" }}>{caName}</div>
+            </div>
+          </div>
+
+          {/* Company selection */}
+          <FRow label="エントリー企業 *">
+            {targetCompanies.length > 0 ? (
+              <select value={form.companyId} onChange={(e) => handleCompanySelect(e.target.value)} style={inp()}>
+                <option value="">企業を選択...</option>
+                {targetCompanies.map((co) => <option key={co.id} value={co.id}>{co.name}</option>)}
+              </select>
+            ) : (
+              <input value={form.companyName} onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))} placeholder="株式会社○○（タブ4に企業を先に登録してください）" style={inp()} />
+            )}
           </FRow>
-          <FRow label="媒体">
-            <input value={media} onChange={(e) => setMedia(e.target.value)} placeholder="リクナビNEXT" style={inp()} />
+          {form.companyName && targetCompanies.length > 0 && (
+            <div style={{ fontSize: 12, color: "#1A5BA6", marginTop: -8, marginBottom: 12 }}>選択企業: {form.companyName}</div>
+          )}
+
+          {/* Media tags */}
+          <FRow label="エントリー媒体">
+            <div style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+              {form.mediaTags.map((tag) => (
+                <span key={tag} style={{ fontSize: 11, fontWeight: 600, background: "#EBF5FF", color: "#0D2B5E", padding: "3px 10px", borderRadius: 14, display: "flex", alignItems: "center", gap: 4 }}>
+                  {tag}
+                  <button onClick={() => removeMediaTag(tag)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9CAAB8", padding: 0, lineHeight: 1 }}>×</button>
+                </span>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <input value={form.mediaInput} onChange={(e) => setForm((f) => ({ ...f, mediaInput: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMediaTag(); } }}
+                placeholder="リクナビNEXT（Enterで追加）" style={{ ...inp(), flex: 1 }} />
+              <button onClick={addMediaTag} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", fontSize: 12, color: "#1A5BA6", fontWeight: 600, whiteSpace: "nowrap" }}>追加</button>
+            </div>
           </FRow>
+
+          {/* Interview dates */}
+          <Lbl>面接候補日</Lbl>
+          {[1,2,3].map((n) => {
+            const dateKey = `date${n}` as keyof EntryForm;
+            const timeKey = `time${n}` as keyof EntryForm;
+            return (
+              <div key={n} style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#9CAAB8", fontWeight: 600, minWidth: 40 }}>第{n}希望</span>
+                <input type="date" value={form[dateKey] as string} onChange={(e) => setForm((f) => ({ ...f, [dateKey]: e.target.value }))} style={inp()} />
+                <input type="time" value={form[timeKey] as string} onChange={(e) => setForm((f) => ({ ...f, [timeKey]: e.target.value }))} style={inp()} />
+              </div>
+            );
+          })}
+
+          {/* Recommendation */}
+          <FRow label="推薦文（自動入力・編集可）">
+            <textarea value={form.recommendation} onChange={(e) => setForm((f) => ({ ...f, recommendation: e.target.value }))}
+              rows={5} placeholder="推薦文がある場合は自動入力されます。編集可能です。"
+              style={{ ...inp(), resize: "vertical" }} />
+          </FRow>
+
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button onClick={() => setShowForm(false)} style={{ padding: "7px 14px", borderRadius: 7, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", fontSize: 12, color: "#9CAAB8" }}>キャンセル</button>
-            <button onClick={handleAdd} disabled={!companyName.trim() || submitting}
-              style={{ padding: "7px 16px", borderRadius: 7, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
-              {submitting ? "送信中..." : "追加"}
+            <button onClick={() => setShowForm(false)} style={{ padding: "8px 16px", borderRadius: 7, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#9CAAB8" }}>キャンセル</button>
+            <button onClick={handleSubmit} disabled={!form.companyName.trim() || submitting}
+              style={{ padding: "8px 20px", borderRadius: 7, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+              {submitting ? "送信中..." : "依頼を作成"}
             </button>
           </div>
         </div>
@@ -665,18 +838,29 @@ function EntryRequestsTab({ candidate, caId, caName }: { candidate: Candidate; c
           {entries.map((e) => {
             const st = ENTRY_STATUS[e.status] ?? ENTRY_STATUS.pending;
             return (
-              <div key={e.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                <ClipboardList size={16} style={{ color: "#4A6FA5", flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E" }}>{e.companyName}</p>
-                  <p style={{ fontSize: 11, color: "#9CAAB8" }}>
-                    {e.media?.join(", ")} · {new Date(e.createdAt).toLocaleDateString("ja-JP")}
-                  </p>
+              <div key={e.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <ClipboardList size={16} style={{ color: "#4A6FA5", flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E", marginBottom: 3 }}>{e.companyName}</p>
+                    <p style={{ fontSize: 11, color: "#9CAAB8", marginBottom: 4 }}>
+                      {e.media && e.media.length > 0 ? e.media.join(", ") + " · " : ""}{new Date(e.createdAt).toLocaleDateString("ja-JP")}
+                    </p>
+                    {e.interviewDates && e.interviewDates.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {e.interviewDates.map((d, i) => (
+                          <span key={i} style={{ fontSize: 10, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#4A6FA5" }}>
+                            第{i+1}候補: {d}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <select value={e.status} onChange={(ev) => handleStatusChange(e.id, ev.target.value as EntryRequest["status"])}
+                    style={{ fontSize: 11, fontWeight: 600, border: `1px solid ${st.bg}`, borderRadius: 8, padding: "3px 8px", background: st.bg, color: st.text, cursor: "pointer", flexShrink: 0 }}>
+                    {Object.entries(ENTRY_STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
+                  </select>
                 </div>
-                <select value={e.status} onChange={(ev) => handleStatusChange(e.id, ev.target.value as EntryRequest["status"])}
-                  style={{ fontSize: 11, fontWeight: 600, border: `1px solid ${st.bg}`, borderRadius: 8, padding: "3px 8px", background: st.bg, color: st.text, cursor: "pointer" }}>
-                  {Object.entries(ENTRY_STATUS).map(([v, s]) => <option key={v} value={v}>{s.label}</option>)}
-                </select>
               </div>
             );
           })}
@@ -695,13 +879,13 @@ const TABS = [
   { id: "entries",  label: "エントリー",  icon: ClipboardList },
 ];
 
-export default function CandidateDetailPage({ params }: { params: Promise<{ id: string; candidateId: string }> }) {
-  const { id: caId, candidateId } = use(params);
+function CandidateDetailInner({ caId, candidateId }: { caId: string; candidateId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [staff, setStaff] = useState<Staff | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("basic");
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "basic");
 
   useEffect(() => {
     Promise.all([fetchCandidateById(candidateId), fetchStaffById(caId)]).then(([c, s]) => {
@@ -772,7 +956,7 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
           <BasicInfoTab candidate={candidate} caId={caId} onUpdated={setCandidate} />
         )}
         {activeTab === "feedback" && (
-          <FeedbackHistoryTab candidateName={candidate.name} />
+          <FeedbackHistoryTab candidateId={candidateId} candidateName={candidate.name} caId={caId} />
         )}
         {activeTab === "docs" && (
           <DocumentsTab candidateName={candidate.name} caId={caId} />
@@ -781,9 +965,21 @@ export default function CandidateDetailPage({ params }: { params: Promise<{ id: 
           <TargetCompaniesTab candidate={candidate} caName={caName} onUpdated={setCandidate} />
         )}
         {activeTab === "entries" && (
-          <EntryRequestsTab candidate={candidate} caId={caId} caName={caName} />
+          <EntryRequestsTab
+            candidate={candidate} caId={caId} caName={caName}
+            targetCompanies={candidate.targetCompanies ?? []}
+          />
         )}
       </div>
     </div>
+  );
+}
+
+export default function CandidateDetailPage({ params }: { params: Promise<{ id: string; candidateId: string }> }) {
+  const { id: caId, candidateId } = use(params);
+  return (
+    <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>}>
+      <CandidateDetailInner caId={caId} candidateId={candidateId} />
+    </Suspense>
   );
 }

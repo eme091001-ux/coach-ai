@@ -350,11 +350,32 @@ export async function fetchManagerComments(feedbackId: string): Promise<ManagerC
 
 // ── Candidates ────────────────────────────────────────────────────────────────
 
+export interface TargetCompany {
+  id: string;
+  name: string;
+  companyId?: string;
+  industry?: string;
+  jobType?: string;
+  minIncome?: number;
+  maxIncome?: number;
+  status: 'considering' | 'entered' | 'interviewing' | 'offered' | 'declined' | 'rejected';
+  recommendation?: string;
+  createdAt: string;
+}
+
 export interface Candidate {
   id: string;
   caId: string;
   caName?: string;
   name: string;
+  age?: number;
+  prefecture?: string;
+  gender?: string;
+  education?: string;
+  currentIncome?: number;
+  desiredIncome?: number;
+  desiredJobs?: string[];
+  targetCompanies?: TargetCompany[];
   reading: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G';
   phase: string;
   currentCompany?: string;
@@ -373,6 +394,14 @@ function mapDbCandidateToApp(row: Record<string, unknown>): Candidate {
     caId: row.ca_id as string,
     caName: row.ca_name as string | undefined,
     name: row.name as string,
+    age: row.age as number | undefined,
+    prefecture: row.prefecture as string | undefined,
+    gender: row.gender as string | undefined,
+    education: row.education as string | undefined,
+    currentIncome: row.current_income as number | undefined,
+    desiredIncome: row.desired_income as number | undefined,
+    desiredJobs: (row.desired_jobs as string[] | null) ?? undefined,
+    targetCompanies: (row.target_companies as TargetCompany[] | null) ?? [],
     reading: row.reading as Candidate['reading'],
     phase: row.phase as string,
     currentCompany: row.current_company as string | undefined,
@@ -397,6 +426,17 @@ export async function fetchCandidates(caId: string): Promise<Candidate[]> {
   return data.map(mapDbCandidateToApp);
 }
 
+export async function fetchCandidateById(id: string): Promise<Candidate | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error || !data) return null;
+  return mapDbCandidateToApp(data);
+}
+
 export async function addCandidate(
   candidate: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Candidate | null> {
@@ -407,6 +447,14 @@ export async function addCandidate(
       ca_id: candidate.caId,
       ca_name: candidate.caName ?? null,
       name: candidate.name,
+      age: candidate.age ?? null,
+      prefecture: candidate.prefecture ?? null,
+      gender: candidate.gender ?? null,
+      education: candidate.education ?? null,
+      current_income: candidate.currentIncome ?? null,
+      desired_income: candidate.desiredIncome ?? null,
+      desired_jobs: candidate.desiredJobs ?? null,
+      target_companies: candidate.targetCompanies ?? [],
       reading: candidate.reading,
       phase: candidate.phase,
       current_company: candidate.currentCompany ?? null,
@@ -429,6 +477,14 @@ export async function updateCandidate(
   if (!isSupabaseConfigured()) return false;
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (updates.name !== undefined) patch.name = updates.name;
+  if (updates.age !== undefined) patch.age = updates.age;
+  if (updates.prefecture !== undefined) patch.prefecture = updates.prefecture;
+  if (updates.gender !== undefined) patch.gender = updates.gender;
+  if (updates.education !== undefined) patch.education = updates.education;
+  if (updates.currentIncome !== undefined) patch.current_income = updates.currentIncome;
+  if (updates.desiredIncome !== undefined) patch.desired_income = updates.desiredIncome;
+  if (updates.desiredJobs !== undefined) patch.desired_jobs = updates.desiredJobs;
+  if (updates.targetCompanies !== undefined) patch.target_companies = updates.targetCompanies;
   if (updates.reading !== undefined) patch.reading = updates.reading;
   if (updates.phase !== undefined) patch.phase = updates.phase;
   if (updates.currentCompany !== undefined) patch.current_company = updates.currentCompany;
@@ -447,12 +503,35 @@ export async function deleteCandidate(id: string): Promise<boolean> {
   return !error;
 }
 
+export async function fetchFeedbackSessionsByCandidateName(name: string): Promise<FeedbackSession[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('feedback_sessions')
+    .select('*, staffs(name)')
+    .eq('candidate_name', name)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapDbSessionToApp);
+}
+
+export async function fetchFeedbackSessionsByCandidateId(candidateId: string): Promise<FeedbackSession[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('feedback_sessions')
+    .select('*, staffs(name)')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapDbSessionToApp);
+}
+
 // ── Entry Requests ────────────────────────────────────────────────────────────
 
 export interface EntryRequest {
   id: string;
   caId: string;
   caName?: string;
+  candidateId?: string;
   candidateName: string;
   companyName: string;
   companyId?: string;
@@ -471,6 +550,7 @@ function mapDbEntryToApp(row: Record<string, unknown>): EntryRequest {
     id: row.id as string,
     caId: row.ca_id as string,
     caName: row.ca_name as string | undefined,
+    candidateId: row.candidate_id as string | undefined,
     candidateName: row.candidate_name as string,
     companyName: row.company_name as string,
     companyId: row.company_id as string | undefined,
@@ -506,6 +586,7 @@ export async function addEntryRequest(
     .insert({
       ca_id: entry.caId,
       ca_name: entry.caName ?? null,
+      candidate_id: entry.candidateId ?? null,
       candidate_name: entry.candidateName,
       company_name: entry.companyName,
       company_id: entry.companyId ?? null,
@@ -672,6 +753,17 @@ export async function upsertMonthlyForecast(
       updated_at: new Date().toISOString(),
     }, { onConflict: 'ca_id,year,month' });
   return !error;
+}
+
+export async function fetchEntryRequestsByCandidateId(candidateId: string): Promise<EntryRequest[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('entry_requests')
+    .select('*')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapDbEntryToApp);
 }
 
 export async function fetchAllMonthlyForecasts(

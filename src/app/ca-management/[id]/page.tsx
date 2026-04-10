@@ -11,7 +11,7 @@ import {
 } from "@/lib/db";
 import { Staff, FeedbackSession } from "@/types";
 import {
-  ChevronLeft, Plus, Trash2, X, Save, FileText, Briefcase,
+  ChevronLeft, Plus, Trash2, Edit2, User, X, Save, FileText, Briefcase,
   FolderOpen, ClipboardList, ChevronDown, ChevronUp,
 } from "lucide-react";
 
@@ -306,6 +306,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Candidate | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCandidates(caId).then((cs) => { setCandidates(cs); setLoading(false); });
@@ -369,41 +370,67 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {candidates.map((c) => {
             const rs = READING_STYLE[c.reading] ?? READING_STYLE.G;
-            const needsOffer = ["A", "B", "C"].includes(c.reading);
+            const showOffer = ["A", "B", "C"].includes(c.reading);
+            const isHovered = hoveredId === c.id;
+            const fmtIncome = (v?: number) => v ? `${v}万` : "—";
             return (
-              <div key={c.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, transition: "box-shadow 0.2s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 12px rgba(59,143,212,0.1)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}>
-                {/* Left — clickable link to detail page */}
-                <Link href={`/ca-management/${caId}/candidates/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 3 }}>{c.name}</p>
-                  <p style={{ fontSize: 11, color: "#9CAAB8" }}>
-                    {c.currentCompany && `現職: ${c.currentCompany}`}
-                    {c.currentCompany && (c.desiredJobs?.length ?? 0) > 0 && " · "}
-                    {(c.desiredJobs?.length ?? 0) > 0 && `希望: ${c.desiredJobs!.slice(0, 2).join("・")}${c.desiredJobs!.length > 2 ? "…" : ""}`}
-                  </p>
-                </Link>
-                {/* Center badges */}
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 12, background: rs.bg, color: rs.text }}>{c.reading}読み</span>
-                  <span style={{ fontSize: 10, color: "#4A6FA5", background: "#EBF5FF", borderRadius: 10, padding: "1px 8px" }}>{c.phase}</span>
-                  {needsOffer && (c.minOffer || c.maxOffer) && (
-                    <span style={{ fontSize: 10, color: "#166534", background: "#D1FAE5", borderRadius: 10, padding: "1px 8px" }}>
-                      ¥{c.minOffer ?? "—"}〜{c.maxOffer ?? "—"}万
-                    </span>
-                  )}
-                </div>
-                {/* Right */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                  <select value={c.nextAction ?? ""} onChange={(e) => handleNextActionChange(c.id, e.target.value)}
-                    style={{ fontSize: 11, border: "1px solid #C8DFF5", borderRadius: 6, padding: "4px 8px", color: "#0D2B5E", background: "#fff", cursor: "pointer" }}>
-                    <option value="">NA未設定</option>
-                    {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
-                  </select>
-                  <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id}
-                    style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #FCA5A5", background: "#FFF0F0", cursor: "pointer", color: "#991B1B" }}>
-                    {deletingId === c.id ? "..." : <Trash2 size={12} />}
-                  </button>
+              <div key={c.id}
+                style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: "14px 16px", transition: "box-shadow 0.2s", boxShadow: isHovered ? "0 2px 12px rgba(59,143,212,0.12)" : "none", position: "relative" }}
+                onMouseEnter={() => setHoveredId(c.id)}
+                onMouseLeave={() => setHoveredId(null)}>
+                {/* Top row */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  {/* Left info */}
+                  <Link href={`/ca-management/${caId}/candidates/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{c.name}</p>
+                      <span style={{ fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: rs.bg, color: rs.text }}>{c.reading}</span>
+                      <span style={{ fontSize: 10, color: "#4A6FA5", background: "#EBF5FF", borderRadius: 8, padding: "1px 7px" }}>{c.phase}</span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
+                      {(c.desiredJobs ?? []).slice(0, 2).map((j) => (
+                        <span key={j} style={{ fontSize: 10, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 6px", color: "#4A6FA5" }}>{j}</span>
+                      ))}
+                      {(c.desiredJobs?.length ?? 0) > 2 && (
+                        <span style={{ fontSize: 10, color: "#9CAAB8" }}>+{c.desiredJobs!.length - 2}</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#9CAAB8" }}>
+                      {(c.currentIncome || c.desiredIncome) && (
+                        <span>{fmtIncome(c.currentIncome)} <span style={{ color: "#C8DFF5" }}>→</span> <span style={{ color: "#0D2B5E", fontWeight: 600 }}>{fmtIncome(c.desiredIncome)}</span></span>
+                      )}
+                      {showOffer && (c.minOffer || c.maxOffer) && (
+                        <span style={{ background: "#DCFCE7", color: "#166534", borderRadius: 6, padding: "1px 7px", fontSize: 10, fontWeight: 600 }}>
+                          ¥{c.minOffer ?? "—"}〜{c.maxOffer ?? "—"}万
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                  {/* Right: NA + action buttons */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                    {/* 3 icon buttons */}
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <Link href={`/ca-management/${caId}/candidates/${c.id}`}
+                        title="詳細"
+                        style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", display: "flex", alignItems: "center", color: "#4A6FA5", textDecoration: "none" }}>
+                        <User size={12} />
+                      </Link>
+                      <button onClick={() => { setEditing(c); setShowModal(true); }} title="編集"
+                        style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", color: "#4A6FA5" }}>
+                        <Edit2 size={12} />
+                      </button>
+                      <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} title="削除"
+                        style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #FCA5A5", background: "#FFF0F0", cursor: "pointer", color: "#991B1B" }}>
+                        {deletingId === c.id ? "..." : <Trash2 size={12} />}
+                      </button>
+                    </div>
+                    {/* NA dropdown */}
+                    <select value={c.nextAction ?? ""} onChange={(e) => handleNextActionChange(c.id, e.target.value)}
+                      style={{ fontSize: 11, border: "1px solid #C8DFF5", borderRadius: 6, padding: "3px 8px", color: "#0D2B5E", background: "#fff", cursor: "pointer" }}>
+                      <option value="">NA未設定</option>
+                      {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
             );
