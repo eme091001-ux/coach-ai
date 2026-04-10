@@ -218,6 +218,117 @@ export async function fetchUserRole(
   return (data?.role as 'admin' | 'manager' | 'ca') ?? 'admin';
 }
 
+// ── Candidate Documents ───────────────────────────────────────────────────────
+
+export interface CandidateDocument {
+  id: string;
+  candidateName: string;
+  caId?: string;
+  caName?: string;
+  documentType: "resume" | "career";
+  documentData: unknown;
+  photoUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapDbDocToApp(row: Record<string, unknown>): CandidateDocument {
+  return {
+    id: row.id as string,
+    candidateName: row.candidate_name as string,
+    caId: row.ca_id as string | undefined,
+    caName: row.ca_name as string | undefined,
+    documentType: row.document_type as "resume" | "career",
+    documentData: row.document_data,
+    photoUrl: row.photo_url as string | undefined,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
+export async function fetchDocuments(caId?: string): Promise<CandidateDocument[]> {
+  if (!isSupabaseConfigured()) return [];
+  let query = supabase
+    .from('candidate_documents')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (caId) query = (query as typeof query).eq('ca_id', caId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+  return data.map(mapDbDocToApp);
+}
+
+export async function saveDocument(
+  doc: Omit<CandidateDocument, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('candidate_documents')
+    .insert({
+      candidate_name: doc.candidateName,
+      ca_id: doc.caId ?? null,
+      ca_name: doc.caName ?? null,
+      document_type: doc.documentType,
+      document_data: doc.documentData,
+      photo_url: doc.photoUrl ?? null,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return null;
+  return data.id as string;
+}
+
+export async function updateDocument(
+  id: string,
+  doc: Partial<Omit<CandidateDocument, 'id' | 'createdAt' | 'updatedAt'>>
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase
+    .from('candidate_documents')
+    .update({
+      ...(doc.candidateName !== undefined && { candidate_name: doc.candidateName }),
+      ...(doc.caId !== undefined && { ca_id: doc.caId }),
+      ...(doc.caName !== undefined && { ca_name: doc.caName }),
+      ...(doc.documentType !== undefined && { document_type: doc.documentType }),
+      ...(doc.documentData !== undefined && { document_data: doc.documentData }),
+      ...(doc.photoUrl !== undefined && { photo_url: doc.photoUrl }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  return !error;
+}
+
+export async function deleteDocument(id: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase
+    .from('candidate_documents')
+    .delete()
+    .eq('id', id);
+  return !error;
+}
+
+export async function uploadDocumentPhoto(
+  dataUrl: string,
+  filename: string
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const mimeMatch = dataUrl.match(/^data:(image\/\w+);/);
+    const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const { data, error } = await supabase
+      .storage
+      .from('documents')
+      .upload(`photos/${filename}`, buffer, { contentType, upsert: true });
+    if (error || !data) return null;
+    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchManagerComments(feedbackId: string): Promise<ManagerComment[]> {
   if (!isSupabaseConfigured()) return [];
 

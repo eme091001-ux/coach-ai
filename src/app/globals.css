@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -25,12 +26,52 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* ── Resume table styles ─────────────────────────────────────── */
+.resume-wrap {
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.resume-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+}
+.resume-table td,
+.resume-table th {
+  border: 1px solid #333;
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+.resume-cell-label {
+  font-size: 10px;
+  color: #555;
+  margin-bottom: 1px;
+}
+.resume-cell-input {
+  border: none;
+  background: transparent;
+  padding: 1px 2px;
+  font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  color: #111;
+}
+.resume-cell-input--auto {
+  background: #EBF5FF;
+}
+.resume-cell-input:focus {
+  background: #f0f8ff;
+}
+
 @media print {
   .no-print {
     display: none !important;
   }
   body {
     background: white !important;
+    font-family: 'Noto Sans JP', sans-serif !important;
   }
   aside {
     display: none !important;
@@ -39,9 +80,31 @@ body {
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    max-width: none !important;
+  }
+  .resume-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .resume-table td,
+  .resume-table th {
+    border: 1px solid #333 !important;
+  }
+  .resume-cell-input,
+  .resume-cell-input--auto {
+    border: none !important;
+    background: transparent !important;
+  }
+  .resume-photo-area img {
+    display: block !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   @page {
-    margin: 15mm;
-    size: A4;
+    margin: 10mm;
+    size: A4 portrait;
   }
 }
