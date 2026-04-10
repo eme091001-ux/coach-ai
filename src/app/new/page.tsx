@@ -2,9 +2,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FeedbackInput, MeetingType, Staff } from "@/types";
-import { fetchStaff } from "@/lib/db";
+import { fetchStaff, fetchAllCandidates, Candidate } from "@/lib/db";
 import { parseTranscriptFile, isTranscriptFile } from "@/lib/parsers/vtt";
-import { Loader2, Sparkles, Upload, FileText } from "lucide-react";
+import { Loader2, Sparkles, Upload, FileText, User, X, Search } from "lucide-react";
 
 const MEETING_TYPES: MeetingType[] = [
   "初回面談",
@@ -31,6 +31,10 @@ export default function NewFeedbackPage() {
   const transcriptFileInputRef = useRef<HTMLInputElement>(null);
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false);
+  const [candidateSearch, setCandidateSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
   const [fileLabel, setFileLabel] = useState<string | null>(null);
@@ -60,7 +64,20 @@ export default function NewFeedbackPage() {
         }));
       }
     });
+    fetchAllCandidates().then(setAllCandidates);
   }, []);
+
+  const handleSelectCandidate = (c: Candidate) => {
+    setSelectedCandidate(c);
+    setForm((prev) => ({ ...prev, candidateName: c.name, candidateId: c.id }));
+    setShowCandidatePicker(false);
+    setCandidateSearch("");
+  };
+
+  const handleClearCandidate = () => {
+    setSelectedCandidate(null);
+    setForm((prev) => ({ ...prev, candidateName: "", candidateId: undefined }));
+  };
 
   const set = (key: keyof FeedbackInput, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -152,9 +169,76 @@ export default function NewFeedbackPage() {
     }
   };
 
+  const filteredCandidates = allCandidates.filter((c) =>
+    c.name.includes(candidateSearch) || (c.currentCompany ?? "").includes(candidateSearch)
+  );
+
   return (
     <div className="p-6 max-w-4xl">
       <h1 className="text-lg font-semibold text-gray-900 mb-6">面談を登録</h1>
+
+      {/* Candidate link section */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-gray-900 flex items-center gap-1.5"><User size={14} />求職者を紐づける（任意）</h2>
+          {!selectedCandidate && (
+            <button onClick={() => setShowCandidatePicker(true)}
+              className="text-xs text-brand-sky hover:text-brand-blue font-semibold">
+              + 求職者を選択
+            </button>
+          )}
+        </div>
+        {selectedCandidate ? (
+          <div className="flex items-center gap-3 bg-blue-50 rounded-lg px-3 py-2">
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-900">{selectedCandidate.name}</p>
+              <p className="text-xs text-gray-500">{selectedCandidate.currentCompany ?? ""}{selectedCandidate.phase ? ` · ${selectedCandidate.phase}` : ""}</p>
+            </div>
+            <button onClick={handleClearCandidate} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-400">求職者と紐づけると面談履歴が求職者ページに表示されます</p>
+        )}
+      </div>
+
+      {/* Candidate picker modal */}
+      {showCandidatePicker && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 14, width: 480, maxHeight: "80vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid #EBF5FF", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <p style={{ fontWeight: 700, fontSize: 15, color: "#0D2B5E" }}>求職者を選択</p>
+              <button onClick={() => { setShowCandidatePicker(false); setCandidateSearch(""); }} style={{ color: "#9CAAB8", background: "none", border: "none", cursor: "pointer" }}><X size={16} /></button>
+            </div>
+            <div style={{ padding: "12px 20px", borderBottom: "1px solid #EBF5FF" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid #C8DFF5", borderRadius: 8, padding: "7px 12px" }}>
+                <Search size={14} style={{ color: "#9CAAB8" }} />
+                <input value={candidateSearch} onChange={(e) => setCandidateSearch(e.target.value)}
+                  placeholder="名前・現職で検索..."
+                  style={{ border: "none", outline: "none", fontSize: 13, color: "#0D2B5E", width: "100%", background: "none" }} />
+              </div>
+            </div>
+            <div style={{ overflowY: "auto", flex: 1, padding: "8px 12px" }}>
+              {filteredCandidates.length === 0 ? (
+                <p style={{ textAlign: "center", padding: 24, fontSize: 13, color: "#9CAAB8" }}>求職者が見つかりません</p>
+              ) : filteredCandidates.map((c) => (
+                <button key={c.id} onClick={() => handleSelectCandidate(c)}
+                  style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 10px", borderRadius: 8, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#F7FAFF"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#EBF5FF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <User size={14} style={{ color: "#1A5BA6" }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E" }}>{c.name}</p>
+                    <p style={{ fontSize: 11, color: "#9CAAB8" }}>{c.currentCompany ?? ""}{c.caName ? ` · CA: ${c.caName}` : ""}</p>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 8, background: "#F1F0E8", color: "#5F5E5A" }}>{c.reading}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-5">
         {/* 左：面談情報 */}

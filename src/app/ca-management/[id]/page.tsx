@@ -11,7 +11,7 @@ import {
 } from "@/lib/db";
 import { Staff, FeedbackSession } from "@/types";
 import {
-  ChevronLeft, Plus, Trash2, Edit2, X, Save, FileText, Briefcase,
+  ChevronLeft, Plus, Trash2, X, Save, FileText, Briefcase,
   FolderOpen, ClipboardList, ChevronDown, ChevronUp,
 } from "lucide-react";
 
@@ -58,17 +58,42 @@ function calcSales(candidates: Candidate[]) {
   return { minS: Math.round(minS), maxS: Math.round(maxS) };
 }
 
+// ── Candidate form constants ───────────────────────────────────────────────────
+const AGES = Array.from({ length: 48 }, (_, i) => i + 18);
+const GENDERS = ["男性", "女性", "その他"];
+const PREFECTURES = ["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県","静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県","徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"];
+const EDUCATIONS = ["中学卒","高校卒","専門学校卒","短大卒","大学卒","大学院卒"];
+const INCOME_OPTIONS = [
+  { label: "100万円未満", value: 50 },
+  ...Array.from({ length: 38 }, (_, i) => ({ label: `${(i + 2) * 50}万円`, value: (i + 2) * 50 })),
+  { label: "2000万円以上", value: 2050 },
+];
+const DESIRED_JOBS_OPTIONS = ["営業","法人営業","個人営業","内勤営業","施工管理","販売","接客","ITエンジニア","起電エンジニア","インフラエンジニア","マーケティング","企画","人事・採用","経理・財務","コンサルタント","マネージャー","その他"];
+
 // ── Candidate Modal ───────────────────────────────────────────────────────────
 interface CandidateForm {
-  name: string; reading: string; phase: string;
-  currentCompany: string; desiredJob: string;
-  minOffer: string; maxOffer: string;
-  nextAction: string; memo: string;
+  name: string;
+  age: string;
+  gender: string;
+  prefecture: string;
+  education: string;
+  currentIncome: string;
+  desiredIncome: string;
+  desiredJobs: string[];
+  reading: string;
+  phase: string;
+  currentCompany: string;
+  minOffer: string;
+  maxOffer: string;
+  nextAction: string;
+  memo: string;
 }
+
 const defaultForm = (): CandidateForm => ({
-  name: "", reading: "F", phase: "F 長期保有",
-  currentCompany: "", desiredJob: "",
-  minOffer: "", maxOffer: "",
+  name: "", age: "", gender: "", prefecture: "", education: "",
+  currentIncome: "", desiredIncome: "", desiredJobs: [],
+  reading: "F", phase: "F 長期保有",
+  currentCompany: "", minOffer: "", maxOffer: "",
   nextAction: "", memo: "",
 });
 
@@ -82,15 +107,25 @@ function CandidateModal({
 }) {
   const [form, setForm] = useState<CandidateForm>(() => {
     if (editing) return {
-      name: editing.name, reading: editing.reading, phase: editing.phase,
-      currentCompany: editing.currentCompany ?? "", desiredJob: editing.desiredJob ?? "",
-      minOffer: editing.minOffer?.toString() ?? "", maxOffer: editing.maxOffer?.toString() ?? "",
-      nextAction: editing.nextAction ?? "", memo: editing.memo ?? "",
+      name: editing.name,
+      age: editing.age?.toString() ?? "",
+      gender: editing.gender ?? "",
+      prefecture: editing.prefecture ?? "",
+      education: editing.education ?? "",
+      currentIncome: editing.currentIncome?.toString() ?? "",
+      desiredIncome: editing.desiredIncome?.toString() ?? "",
+      desiredJobs: editing.desiredJobs ?? [],
+      reading: editing.reading,
+      phase: editing.phase,
+      currentCompany: editing.currentCompany ?? "",
+      minOffer: editing.minOffer?.toString() ?? "",
+      maxOffer: editing.maxOffer?.toString() ?? "",
+      nextAction: editing.nextAction ?? "",
+      memo: editing.memo ?? "",
     };
     return defaultForm();
   });
   const [saving, setSaving] = useState(false);
-
   const needsOffer = ["A", "B", "C"].includes(form.reading);
 
   const handlePhaseChange = (val: string) => {
@@ -98,21 +133,37 @@ function CandidateModal({
     setForm((f) => ({ ...f, reading: val, phase: opt?.label ?? val }));
   };
 
+  const toggleJob = (job: string) => {
+    setForm((f) => ({
+      ...f,
+      desiredJobs: f.desiredJobs.includes(job)
+        ? f.desiredJobs.filter((j) => j !== job)
+        : [...f.desiredJobs, job],
+    }));
+  };
+
   const handleSave = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const payload = {
+      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
         caId, caName,
         name: form.name,
+        age: form.age ? parseInt(form.age) : undefined,
+        gender: form.gender || undefined,
+        prefecture: form.prefecture || undefined,
+        education: form.education || undefined,
+        currentIncome: form.currentIncome ? parseInt(form.currentIncome) : undefined,
+        desiredIncome: form.desiredIncome ? parseInt(form.desiredIncome) : undefined,
+        desiredJobs: form.desiredJobs.length > 0 ? form.desiredJobs : undefined,
         reading: form.reading as Candidate["reading"],
         phase: form.phase,
         currentCompany: form.currentCompany || undefined,
-        desiredJob: form.desiredJob || undefined,
         minOffer: needsOffer && form.minOffer ? parseInt(form.minOffer) : undefined,
         maxOffer: needsOffer && form.maxOffer ? parseInt(form.maxOffer) : undefined,
         nextAction: form.nextAction || undefined,
         memo: form.memo || undefined,
+        targetCompanies: editing?.targetCompanies ?? [],
       };
       if (editing) {
         await updateCandidate(editing.id, payload);
@@ -125,61 +176,122 @@ function CandidateModal({
     } finally { setSaving(false); onClose(); }
   };
 
+  const S = (style?: React.CSSProperties): React.CSSProperties => ({
+    width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5",
+    borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box",
+    ...style,
+  });
   const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 12 }}>
       <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
       {children}
     </div>
   );
-  const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5", borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 14, width: 480, maxHeight: "90vh", overflowY: "auto", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "92vh", overflowY: "auto", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <p style={{ fontWeight: 700, fontSize: 16, color: "#0D2B5E" }}>{editing ? "求職者を編集" : "求職者を追加"}</p>
-          <button onClick={onClose} style={{ color: "#9CAAB8" }}><X size={18} /></button>
+          <button onClick={onClose} style={{ color: "#9CAAB8", background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
         </div>
 
+        {/* 基本情報 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>基本情報</p>
         <F label="氏名 *">
-          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" style={inputStyle} />
+          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" style={S()} />
         </F>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <F label="読み（フェーズ） *">
-            <select value={form.reading} onChange={(e) => handlePhaseChange(e.target.value)} style={inputStyle}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <F label="年齢">
+            <select value={form.age} onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))} style={S()}>
+              <option value="">選択</option>
+              {AGES.map((a) => <option key={a} value={a}>{a}歳</option>)}
+            </select>
+          </F>
+          <F label="性別">
+            <select value={form.gender} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))} style={S()}>
+              <option value="">選択</option>
+              {GENDERS.map((g) => <option key={g}>{g}</option>)}
+            </select>
+          </F>
+          <F label="最終学歴">
+            <select value={form.education} onChange={(e) => setForm((f) => ({ ...f, education: e.target.value }))} style={S()}>
+              <option value="">選択</option>
+              {EDUCATIONS.map((e) => <option key={e}>{e}</option>)}
+            </select>
+          </F>
+        </div>
+        <F label="現住所（都道府県）">
+          <select value={form.prefecture} onChange={(e) => setForm((f) => ({ ...f, prefecture: e.target.value }))} style={S()}>
+            <option value="">選択</option>
+            {PREFECTURES.map((p) => <option key={p}>{p}</option>)}
+          </select>
+        </F>
+
+        {/* 職歴・希望 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>職歴・希望</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <F label="現年収">
+            <select value={form.currentIncome} onChange={(e) => setForm((f) => ({ ...f, currentIncome: e.target.value }))} style={S()}>
+              <option value="">選択</option>
+              {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </F>
+          <F label="希望年収">
+            <select value={form.desiredIncome} onChange={(e) => setForm((f) => ({ ...f, desiredIncome: e.target.value }))} style={S()}>
+              <option value="">選択</option>
+              {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </F>
+          <F label="現職">
+            <input value={form.currentCompany} onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))} placeholder="株式会社○○" style={S()} />
+          </F>
+        </div>
+        <F label="希望職種（複数選択可）">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {DESIRED_JOBS_OPTIONS.map((job) => {
+              const checked = form.desiredJobs.includes(job);
+              return (
+                <button key={job} onClick={() => toggleJob(job)} type="button"
+                  style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", border: checked ? "2px solid #1A5BA6" : "1px solid #C8DFF5", background: checked ? "#EBF5FF" : "#F7FAFF", color: checked ? "#0D2B5E" : "#4A6FA5" }}>
+                  {job}
+                </button>
+              );
+            })}
+          </div>
+        </F>
+
+        {/* 転職活動情報 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>転職活動情報</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <F label="読み *">
+            <select value={form.reading} onChange={(e) => handlePhaseChange(e.target.value)} style={S()}>
               {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </F>
           <F label="ネクストアクション">
-            <select value={form.nextAction} onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value }))} style={inputStyle}>
+            <select value={form.nextAction} onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value }))} style={S()}>
               <option value="">選択...</option>
               {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
             </select>
           </F>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <F label="現職">
-            <input value={form.currentCompany} onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))} placeholder="株式会社○○" style={inputStyle} />
-          </F>
-          <F label="希望職種">
-            <input value={form.desiredJob} onChange={(e) => setForm((f) => ({ ...f, desiredJob: e.target.value }))} placeholder="営業 / エンジニア" style={inputStyle} />
-          </F>
-        </div>
         {needsOffer && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <F label="ミニマム金額（万円）">
-              <input type="number" value={form.minOffer} onChange={(e) => setForm((f) => ({ ...f, minOffer: e.target.value }))} placeholder="500" style={inputStyle} />
+              <input type="number" value={form.minOffer} onChange={(e) => setForm((f) => ({ ...f, minOffer: e.target.value }))} placeholder="500" style={S()} />
             </F>
             <F label="マックス金額（万円）">
-              <input type="number" value={form.maxOffer} onChange={(e) => setForm((f) => ({ ...f, maxOffer: e.target.value }))} placeholder="700" style={inputStyle} />
+              <input type="number" value={form.maxOffer} onChange={(e) => setForm((f) => ({ ...f, maxOffer: e.target.value }))} placeholder="700" style={S()} />
             </F>
           </div>
         )}
         <F label="メモ">
-          <textarea value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} rows={3} placeholder="自由記述..." style={{ ...inputStyle, resize: "vertical" }} />
+          <textarea value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} rows={3} placeholder="自由記述..." style={{ ...S(), resize: "vertical" }} />
         </F>
+
         <button onClick={handleSave} disabled={!form.name.trim() || saving}
-          style={{ width: "100%", padding: "11px 0", borderRadius: 8, fontSize: 14, fontWeight: 700, background: form.name.trim() ? "linear-gradient(135deg,#0D2B5E,#1A5BA6)" : "#E0E8F0", color: form.name.trim() ? "#fff" : "#9CAAB8", border: "none", cursor: form.name.trim() ? "pointer" : "not-allowed" }}>
+          style={{ width: "100%", padding: "11px 0", borderRadius: 8, fontSize: 14, fontWeight: 700, background: form.name.trim() ? "linear-gradient(135deg,#0D2B5E,#1A5BA6)" : "#E0E8F0", color: form.name.trim() ? "#fff" : "#9CAAB8", border: "none", cursor: form.name.trim() ? "pointer" : "not-allowed", marginTop: 4 }}>
           {saving ? "保存中..." : <><Save size={14} style={{ display: "inline", marginRight: 6 }} />保存する</>}
         </button>
       </div>
@@ -262,15 +374,15 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
               <div key={c.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14, transition: "box-shadow 0.2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 2px 12px rgba(59,143,212,0.1)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; }}>
-                {/* Left */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Left — clickable link to detail page */}
+                <Link href={`/ca-management/${caId}/candidates/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
                   <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 3 }}>{c.name}</p>
                   <p style={{ fontSize: 11, color: "#9CAAB8" }}>
                     {c.currentCompany && `現職: ${c.currentCompany}`}
-                    {c.currentCompany && c.desiredJob && " · "}
-                    {c.desiredJob && `希望: ${c.desiredJob}`}
+                    {c.currentCompany && (c.desiredJobs?.length ?? 0) > 0 && " · "}
+                    {(c.desiredJobs?.length ?? 0) > 0 && `希望: ${c.desiredJobs!.slice(0, 2).join("・")}${c.desiredJobs!.length > 2 ? "…" : ""}`}
                   </p>
-                </div>
+                </Link>
                 {/* Center badges */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flexShrink: 0 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 12, background: rs.bg, color: rs.text }}>{c.reading}読み</span>
@@ -288,10 +400,6 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
                     <option value="">NA未設定</option>
                     {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
                   </select>
-                  <button onClick={() => { setEditing(c); setShowModal(true); }}
-                    style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", color: "#4A6FA5" }}>
-                    <Edit2 size={12} />
-                  </button>
                   <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id}
                     style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #FCA5A5", background: "#FFF0F0", cursor: "pointer", color: "#991B1B" }}>
                     {deletingId === c.id ? "..." : <Trash2 size={12} />}
