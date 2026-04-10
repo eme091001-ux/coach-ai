@@ -243,9 +243,9 @@ export default function StaffDetailPage({
                     type="monotone"
                     dataKey="score"
                     name="スコア"
-                    stroke="#10b981"
+                    stroke="#3B8FD4"
                     strokeWidth={2}
-                    dot={{ r: 4, fill: "#10b981" }}
+                    dot={{ r: 4, fill: "#3B8FD4" }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -415,7 +415,7 @@ export default function StaffDetailPage({
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 />
               </div>
               <div>
@@ -430,7 +430,7 @@ export default function StaffDetailPage({
                       experience: e.target.value,
                     }))
                   }
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 >
                   {["1年未満", "1〜2年", "3〜5年", "5年以上"].map((v) => (
                     <option key={v}>{v}</option>
@@ -444,7 +444,7 @@ export default function StaffDetailPage({
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, role: e.target.value }))
                   }
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 >
                   {["CA", "シニアCA", "リーダー", "マネージャー"].map((v) => (
                     <option key={v}>{v}</option>
@@ -461,7 +461,7 @@ export default function StaffDetailPage({
                   onChange={(e) =>
                     setEditForm((prev) => ({ ...prev, email: e.target.value }))
                   }
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 />
               </div>
             </div>
@@ -476,7 +476,7 @@ export default function StaffDetailPage({
               <button
                 onClick={handleSave}
                 disabled={saving || !editForm.name.trim()}
-                className="flex-1 flex items-center justify-center gap-1.5 text-sm bg-emerald-600 text-white py-2.5 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 text-sm bg-brand-navy text-white py-2.5 rounded-lg hover:bg-brand-blue transition-colors disabled:opacity-50"
               >
                 {saving ? (
                   <Loader2 size={13} className="animate-spin" />

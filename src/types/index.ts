@@ -23,6 +23,14 @@ export interface ScoreBreakdown {
   initiative: number;   // 主体性
 }
 
+export interface ScoreDetail {
+  category: string;
+  score: number;
+  max: number;
+  basis: string[];
+  improvements: string[];
+}
+
 export interface KpiImpact {
   acceptance: string;   // 承諾率
   application: string;  // 応募率
@@ -68,6 +76,9 @@ export interface FeedbackSession {
   nextTheme: string;
   managerComment: string;
   scores: ScoreBreakdown;
+  scoreDetails?: ScoreDetail[];
+  totalBasis?: string;
+  totalImprovement?: string;
   kpiImpact: KpiImpact;
   status: FeedbackStatus;
   createdAt: string;

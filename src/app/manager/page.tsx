@@ -86,7 +86,7 @@ export default function ManagerPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={cn("text-xs px-2 py-0.5 rounded-full", badge.className)}>{badge.label}</span>
                     <span className={cn("text-xl font-semibold w-10 text-right", scoreColor(s.totalScore))}>{s.totalScore}</span>
-                    <button className="text-xs bg-emerald-600 text-white hover:bg-emerald-700 px-3 py-1.5 rounded-lg transition-colors">
+                    <button className="text-xs bg-brand-navy text-white hover:bg-brand-blue px-3 py-1.5 rounded-lg transition-colors">
                       確認する
                     </button>
                     <ChevronRight size={14} className="text-gray-300" />
@@ -120,7 +120,7 @@ export default function ManagerPage() {
                   <span className={cn("text-xl font-semibold w-10 text-right", scoreColor(s.totalScore))}>{s.totalScore}</span>
                   <span className={cn("text-xs px-2 py-0.5 rounded-full",
                     s.status === "未確認" ? "bg-red-100 text-red-700" :
-                    s.status === "確認済" ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
+                    s.status === "確認済" ? "bg-blue-100 text-blue-700" : "bg-brand-pale text-brand-navy"
                   )}>{s.status}</span>
                   <ChevronRight size={14} className="text-gray-300" />
                 </div>

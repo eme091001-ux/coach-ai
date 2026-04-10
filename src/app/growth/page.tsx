@@ -56,7 +56,7 @@ export default function GrowthPage() {
         <select
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-sky"
         >
           {STAFF_LIST.map((s) => <option key={s}>{s}</option>)}
         </select>
@@ -70,7 +70,7 @@ export default function GrowthPage() {
         </div>
         <div className="bg-gray-100 rounded-xl p-4">
           <p className="text-xs text-gray-500 mb-1">3ヶ月の変化</p>
-          <p className={cn("text-2xl font-semibold", diff > 0 ? "text-emerald-600" : "text-red-500")}>
+          <p className={cn("text-2xl font-semibold", diff > 0 ? "text-brand-sky" : "text-red-500")}>
             {diff > 0 ? "+" : ""}{diff}pt
           </p>
         </div>
@@ -106,7 +106,7 @@ export default function GrowthPage() {
                   const y = MAX_H - ((s - 50) / 50) * MAX_H + 10;
                   return `${x},${y}`;
                 }).join(" ")}
-                fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                fill="none" stroke="#3B8FD4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
               />
               {/* Dots + labels */}
               {scores.map((s, i) => {
@@ -114,7 +114,7 @@ export default function GrowthPage() {
                 const y = MAX_H - ((s - 50) / 50) * MAX_H + 10;
                 return (
                   <g key={i}>
-                    <circle cx={x} cy={y} r="4" fill="#10b981" />
+                    <circle cx={x} cy={y} r="4" fill="#3B8FD4" />
                     <text x={x} y={y - 10} textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">{s}</text>
                     <text x={x} y={MAX_H + 28} textAnchor="middle" fontSize="10" fill="#9ca3af">{MONTHS[i]}</text>
                   </g>
@@ -131,7 +131,7 @@ export default function GrowthPage() {
             {(Object.keys(SCORE_LABELS) as (keyof typeof SCORE_LABELS)[]).map((key) => {
               const val = itemScores[key] || 0;
               const pct = (val / 10) * 100;
-              const color = val >= 7 ? "bg-emerald-500" : val >= 5 ? "bg-amber-400" : "bg-red-400";
+              const color = val >= 7 ? "bg-brand-sky" : val >= 5 ? "bg-amber-400" : "bg-red-400";
               return (
                 <div key={key}>
                   <div className="flex justify-between text-xs mb-1">
@@ -161,7 +161,7 @@ export default function GrowthPage() {
             </div>
             <span className={cn(
               "text-xs px-2.5 py-1 rounded-full",
-              t.status === "改善済" ? "bg-emerald-100 text-emerald-700" :
+              t.status === "改善済" ? "bg-brand-pale text-brand-navy" :
               t.status === "改善中" ? "bg-amber-100 text-amber-700" :
               "bg-gray-100 text-gray-500"
             )}>

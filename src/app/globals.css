@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-navy: #0D2B5E;
+  --color-brand-blue: #1A5BA6;
+  --color-brand-sky: #3B8FD4;
+  --color-brand-pale: #E8F2FC;
+  --color-brand-light: #C8DFF5;
+}
+
+:root {
+  --brand-navy-deep: #0D2B5E;
+  --brand-navy-mid: #1A5BA6;
+  --brand-sky: #3B8FD4;
+  --brand-sky-light: #C8DFF5;
+  --brand-pale: #E8F2FC;
+  --gradient-hero: linear-gradient(135deg, #0D2B5E 0%, #1A5BA6 60%, #2E7FC4 100%);
+  --text-primary: #0D2B5E;
+  --text-secondary: #4A6FA5;
+  --surface: #FFFFFF;
+  --border: #C8DFF5;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }

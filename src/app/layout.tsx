@@ -5,7 +5,7 @@ import { NextAuthProvider } from "@/components/providers/SessionProvider";
 import { auth } from "@/auth";
 
 export const metadata: Metadata = {
-  title: "CoachAI — 面談フィードバック",
+  title: "Funrix AI Coach | 面談フィードバック",
   description: "AI面談・営業フィードバック自動生成ツール",
 };
 

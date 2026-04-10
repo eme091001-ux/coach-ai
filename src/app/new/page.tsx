@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FeedbackInput, MeetingType, Staff } from "@/types";
 import { fetchStaff } from "@/lib/db";
-import { Loader2, Sparkles, Upload } from "lucide-react";
+import { parseTranscriptFile, isTranscriptFile } from "@/lib/parsers/vtt";
+import { Loader2, Sparkles, Upload, FileText } from "lucide-react";
 
 const MEETING_TYPES: MeetingType[] = [
   "初回面談",
@@ -27,10 +28,12 @@ CA: では応募の方向で進めましょう。また連絡します。`;
 export default function NewFeedbackPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const transcriptFileInputRef = useRef<HTMLInputElement>(null);
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileLabel, setFileLabel] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [form, setForm] = useState<FeedbackInput>({
     meetingDate: new Date().toISOString().split("T")[0],
@@ -79,8 +82,9 @@ export default function NewFeedbackPage() {
       setError("PDFファイルを選択してください");
       return;
     }
-    setPdfLoading(true);
+    setFileLoading(true);
     setError("");
+    setFileLabel(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -88,11 +92,35 @@ export default function NewFeedbackPage() {
       if (!res.ok) throw new Error("PDF解析失敗");
       const { text } = await res.json();
       set("transcript", text);
+      setFileLabel(`PDF: ${file.name}`);
     } catch {
       setError("PDFの読み込みに失敗しました");
     } finally {
-      setPdfLoading(false);
+      setFileLoading(false);
     }
+  };
+
+  const handleTranscriptFileUpload = (file: File) => {
+    if (!isTranscriptFile(file.name)) {
+      setError(".vtt / .srt / .txt ファイルを選択してください");
+      return;
+    }
+    setFileLoading(true);
+    setError("");
+    setFileLabel(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      const parsed = parseTranscriptFile(content, file.name);
+      set("transcript", parsed);
+      setFileLabel(`文字起こし: ${file.name}`);
+      setFileLoading(false);
+    };
+    reader.onerror = () => {
+      setError("ファイルの読み込みに失敗しました");
+      setFileLoading(false);
+    };
+    reader.readAsText(file, "UTF-8");
   };
 
   const handleSubmit = async () => {
@@ -141,7 +169,7 @@ export default function NewFeedbackPage() {
                   type="date"
                   value={form.meetingDate}
                   onChange={(e) => set("meetingDate", e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 />
               </div>
 
@@ -150,7 +178,7 @@ export default function NewFeedbackPage() {
                 <select
                   value={form.meetingType}
                   onChange={(e) => set("meetingType", e.target.value as MeetingType)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 >
                   {MEETING_TYPES.map((t) => (
                     <option key={t}>{t}</option>
@@ -163,7 +191,7 @@ export default function NewFeedbackPage() {
                 <select
                   value={form.staffId ?? ""}
                   onChange={(e) => handleStaffChange(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 >
                   {staffList.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -178,7 +206,7 @@ export default function NewFeedbackPage() {
                 <select
                   value={form.staffExperience}
                   onChange={(e) => set("staffExperience", e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 >
                   {["1年未満", "1〜2年", "3〜5年", "5年以上"].map((v) => (
                     <option key={v}>{v}</option>
@@ -195,7 +223,7 @@ export default function NewFeedbackPage() {
                   value={form.candidateName}
                   onChange={(e) => set("candidateName", e.target.value)}
                   placeholder="山本 健一"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 />
               </div>
             </div>
@@ -212,7 +240,7 @@ export default function NewFeedbackPage() {
                   value={form.companyPolicy}
                   onChange={(e) => set("companyPolicy", e.target.value)}
                   rows={3}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky resize-none"
                 />
               </div>
               <div>
@@ -223,7 +251,7 @@ export default function NewFeedbackPage() {
                   value={form.managerPolicy}
                   onChange={(e) => set("managerPolicy", e.target.value)}
                   rows={3}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky resize-none"
                 />
               </div>
               <div>
@@ -232,7 +260,7 @@ export default function NewFeedbackPage() {
                   type="text"
                   value={form.ngWords}
                   onChange={(e) => set("ngWords", e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky"
                 />
               </div>
             </div>
@@ -242,8 +270,9 @@ export default function NewFeedbackPage() {
         {/* 右：文字起こし */}
         <div className="flex flex-col gap-5">
           <div className="bg-white rounded-xl border border-gray-100 p-5 flex-1">
-            {/* PDFアップロード */}
-            <div className="mb-3">
+            {/* ファイルアップロード */}
+            <div className="mb-3 space-y-2">
+              {/* PDF */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -255,21 +284,52 @@ export default function NewFeedbackPage() {
                   e.target.value = "";
                 }}
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={pdfLoading}
-                className="flex items-center gap-1.5 w-full justify-center text-sm border border-dashed border-gray-300 text-gray-500 hover:border-emerald-400 hover:text-emerald-600 rounded-lg px-3 py-2.5 transition-colors disabled:opacity-50"
-              >
-                {pdfLoading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" /> PDF解析中...
-                  </>
-                ) : (
-                  <>
-                    <Upload size={14} /> PDFをアップロードしてテキスト抽出
-                  </>
-                )}
-              </button>
+              {/* VTT / SRT / TXT */}
+              <input
+                ref={transcriptFileInputRef}
+                type="file"
+                accept=".vtt,.srt,.txt,text/vtt,text/plain"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleTranscriptFileUpload(file);
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={fileLoading}
+                  className="flex-1 flex items-center gap-1.5 justify-center text-sm border border-dashed border-gray-300 text-gray-500 hover:border-brand-sky hover:text-brand-sky rounded-lg px-3 py-2.5 transition-colors disabled:opacity-50"
+                >
+                  {fileLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Upload size={14} />
+                  )}
+                  PDF
+                </button>
+                <button
+                  onClick={() => transcriptFileInputRef.current?.click()}
+                  disabled={fileLoading}
+                  className="flex-1 flex items-center gap-1.5 justify-center text-sm border border-dashed border-gray-300 text-gray-500 hover:border-brand-sky hover:text-brand-sky rounded-lg px-3 py-2.5 transition-colors disabled:opacity-50"
+                >
+                  {fileLoading ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <FileText size={14} />
+                  )}
+                  Zoom文字起こし
+                </button>
+              </div>
+              {fileLabel && (
+                <p className="text-xs text-brand-sky flex items-center gap-1">
+                  <FileText size={11} /> {fileLabel}
+                </p>
+              )}
+              <p className="text-[10px] text-gray-400">
+                対応形式: PDF / .vtt (Zoom) / .srt / .txt
+              </p>
             </div>
 
             <div className="flex items-center justify-between mb-3">
@@ -277,8 +337,8 @@ export default function NewFeedbackPage() {
                 文字起こしテキスト
               </h2>
               <button
-                onClick={() => set("transcript", SAMPLE_TRANSCRIPT)}
-                className="text-xs text-emerald-600 hover:text-emerald-700 underline"
+                onClick={() => { set("transcript", SAMPLE_TRANSCRIPT); setFileLabel(null); }}
+                className="text-xs text-brand-sky hover:text-brand-blue underline"
               >
                 サンプルを使う
               </button>
@@ -286,9 +346,9 @@ export default function NewFeedbackPage() {
             <textarea
               value={form.transcript}
               onChange={(e) => set("transcript", e.target.value)}
-              rows={18}
+              rows={16}
               placeholder="面談の文字起こしテキストをここに貼り付けてください..."
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none leading-relaxed"
+              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-sky resize-none leading-relaxed"
             />
             <p className="text-xs text-gray-400 mt-1">{form.transcript.length}文字</p>
           </div>
@@ -302,7 +362,8 @@ export default function NewFeedbackPage() {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium py-3.5 rounded-xl transition-colors"
+            className="flex items-center justify-center gap-2 w-full text-white text-sm font-medium py-3.5 rounded-xl transition-colors disabled:opacity-50"
+            style={{ background: loading ? undefined : "linear-gradient(135deg, #0D2B5E 0%, #1A5BA6 100%)" }}
           >
             {loading ? (
               <>

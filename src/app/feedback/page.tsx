@@ -77,7 +77,7 @@ export default function FeedbackListPage() {
         <select
           value={staff}
           onChange={(e) => setStaff(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-sky"
         >
           <option value="すべて">担当者: すべて</option>
           {staffList.map((s) => (
@@ -88,7 +88,7 @@ export default function FeedbackListPage() {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-sky"
         >
           {MEETING_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -100,7 +100,7 @@ export default function FeedbackListPage() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-sky"
         >
           {STATUSES.map((s) => (
             <option key={s} value={s}>

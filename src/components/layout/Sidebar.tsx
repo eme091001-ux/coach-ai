@@ -26,14 +26,17 @@ export default function Sidebar() {
   const { data: session } = useSession();
 
   return (
-    <aside className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
-      <div className="px-4 py-5 border-b border-gray-100">
-        <p className="text-sm font-semibold text-gray-900">CoachAI</p>
-        <p className="text-xs text-gray-400 mt-0.5">面談フィードバック</p>
+    <aside
+      className="w-56 shrink-0 flex flex-col"
+      style={{ background: "linear-gradient(135deg, #0D2B5E 0%, #1A5BA6 60%, #2E7FC4 100%)" }}
+    >
+      <div className="px-4 py-5 border-b border-white/10">
+        <p className="text-sm font-bold text-white tracking-tight">Funrix</p>
+        <p className="text-xs text-white/50 mt-0.5">AI Coach</p>
       </div>
 
       <nav className="flex-1 py-3">
-        <p className="px-4 text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">
+        <p className="px-4 text-[10px] font-medium text-white/40 uppercase tracking-wider mb-1">
           メニュー
         </p>
         {NAV.map(({ href, label, icon: Icon }) => (
@@ -43,8 +46,8 @@ export default function Sidebar() {
             className={cn(
               "flex items-center gap-2.5 px-4 py-2 text-sm transition-colors",
               pathname === href
-                ? "bg-emerald-50 text-emerald-800 font-medium"
-                : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                ? "bg-white/15 text-white font-medium"
+                : "text-white/65 hover:bg-white/10 hover:text-white"
             )}
           >
             <Icon size={15} className="shrink-0" />
@@ -52,7 +55,7 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        <p className="px-4 text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-4 mb-1">
+        <p className="px-4 text-[10px] font-medium text-white/40 uppercase tracking-wider mt-4 mb-1">
           アクション
         </p>
         <Link
@@ -60,8 +63,8 @@ export default function Sidebar() {
           className={cn(
             "flex items-center gap-2.5 px-4 py-2 text-sm transition-colors",
             pathname === "/new"
-              ? "bg-emerald-50 text-emerald-800 font-medium"
-              : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+              ? "bg-white/15 text-white font-medium"
+              : "text-white/65 hover:bg-white/10 hover:text-white"
           )}
         >
           <Plus size={15} className="shrink-0" />
@@ -71,7 +74,7 @@ export default function Sidebar() {
 
       {/* User info */}
       {session?.user && (
-        <div className="px-4 py-3 border-t border-gray-100">
+        <div className="px-4 py-3 border-t border-white/10">
           <div className="flex items-center gap-2 min-w-0">
             {session.user.image ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -84,22 +87,22 @@ export default function Sidebar() {
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-xs font-medium shrink-0">
+              <div className="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs font-medium shrink-0">
                 {session.user.name?.[0] ?? "U"}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-700 truncate">
+              <p className="text-xs font-medium text-white truncate">
                 {session.user.name}
               </p>
-              <p className="text-[10px] text-gray-400 truncate">
+              <p className="text-[10px] text-white/50 truncate">
                 {session.user.email}
               </p>
             </div>
           </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 transition-colors"
+            className="mt-2 flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors"
           >
             <LogOut size={11} />
             ログアウト

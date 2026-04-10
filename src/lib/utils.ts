@@ -7,19 +7,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function scoreColor(score: number): string {
-  if (score >= 75) return "text-emerald-600";
+  if (score >= 75) return "text-brand-sky";
   if (score >= 60) return "text-amber-600";
   return "text-red-500";
 }
 
 export function scoreBarColor(score: number): string {
-  if (score >= 7) return "bg-emerald-500";
+  if (score >= 7) return "bg-brand-sky";
   if (score >= 5) return "bg-amber-400";
   return "bg-red-400";
 }
 
 export function scoreBadge(score: number): { label: string; className: string } {
-  if (score >= 80) return { label: "優秀", className: "bg-emerald-100 text-emerald-800" };
+  if (score >= 80) return { label: "優秀", className: "bg-brand-pale text-brand-navy" };
   if (score >= 65) return { label: "良好", className: "bg-blue-100 text-blue-800" };
   if (score >= 50) return { label: "要改善", className: "bg-amber-100 text-amber-800" };
   return { label: "緊急改善", className: "bg-red-100 text-red-800" };

@@ -30,9 +30,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-lg font-semibold text-gray-900">ダッシュボード</h1>
         <div className="flex items-center gap-3">
-          <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">2026年4月</span>
+          <span className="text-xs bg-brand-pale text-brand-navy px-3 py-1 rounded-full">2026年4月</span>
           <Link href="/new">
-            <button className="flex items-center gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors">
+            <button className="flex items-center gap-1.5 text-sm bg-brand-navy hover:bg-brand-blue text-white px-4 py-2 rounded-lg transition-colors">
               <Plus size={14} /> 面談を登録
             </button>
           </Link>
@@ -41,8 +41,8 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-4 gap-3 mb-6">
         {[
-          { label: "今月の面談数", value: "47", sub: "▲ 前月比 +12%", subColor: "text-emerald-600", icon: FileText },
-          { label: "平均スコア", value: String(avgScore), sub: "▲ 前月比 +4pt", subColor: "text-emerald-600", icon: TrendingUp },
+          { label: "今月の面談数", value: "47", sub: "▲ 前月比 +12%", subColor: "text-brand-sky", icon: FileText },
+          { label: "平均スコア", value: String(avgScore), sub: "▲ 前月比 +4pt", subColor: "text-brand-sky", icon: TrendingUp },
           { label: "承諾率（平均）", value: "38%", sub: "▼ 目標 45%", subColor: "text-red-500", icon: Users },
           { label: "未確認FB", value: String(unconfirmed) + "件", sub: "要確認", subColor: "text-amber-600", icon: AlertTriangle },
         ].map(({ label, value, sub, subColor, icon: Icon }) => (
@@ -88,7 +88,7 @@ export default function DashboardPage() {
                   <span className="font-medium">{t.count}件</span>
                 </div>
                 <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div className={cn("h-full rounded-full", t.pct >= 70 ? "bg-red-400" : t.pct >= 50 ? "bg-amber-400" : "bg-emerald-400")} style={{ width: t.pct + "%" }} />
+                  <div className={cn("h-full rounded-full", t.pct >= 70 ? "bg-red-400" : t.pct >= 50 ? "bg-amber-400" : "bg-brand-sky")} style={{ width: t.pct + "%" }} />
                 </div>
               </div>
             ))}

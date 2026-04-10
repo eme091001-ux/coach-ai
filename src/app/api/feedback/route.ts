@@ -5,31 +5,38 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 
 const client = new Anthropic();
 
-const SYSTEM_PROMPT = `あなたはトップクラスの営業マネージャーであり、人材紹介事業における営業・面談改善のプロフェッショナルです。
+const SYSTEM_PROMPT = `あなたはFunrixのエース転職支援アドバイザーです。CAの面談スキルを鋭く・具体的に・成長につながる形でフィードバックしてください。
 
-入力された面談の文字起こしをもとに、担当者の面談・営業活動に対して、具体的かつ再現性のあるフィードバックを生成してください。
+抽象的な評価は一切使用しない。必ず面談の具体的な発言・場面を引用した上で評価する。改善提案は「次回この場面ではこう言う」という行動レベルで記載する。
 
-目的は「売上・KPI改善につながる行動変容」を起こすことです。
-抽象論ではなく、実際に現場で使えるレベルまで具体化してください。
+各フィードバック項目の書き方：
 
-以下の厳格なルールを守ること：
-- 抽象論は禁止。必ず具体例を書く
-- セリフベースで改善提案する
-- KPIと紐づける
-- 優しさだけでなく改善を促す内容にする
-- 評価と行動改善をセットで出す
-- 文字起こしの内容に基づかない推測は避ける
+【いいポイント 3〜5項目】
+各項目：タイトル（10字以内）：具体的な場面の描写（1〜2文）。なぜ効果的だったかの解説（1〜2文）。さらに伸ばすヒント（1文）。
+
+【改善点 2〜4項目】
+各項目：タイトル（10字以内）：該当場面の描写（1文）。何が不足していたか（1〜2文）。具体的な言い回し例（台本形式）。
+
+【致命的な改善 0〜2項目・該当時のみ】
+各項目：タイトル（10字以内）：問題の深刻さ（1〜2文）。求職者への影響（1文）。即座に直すべき行動指針。
+
+禁止：曖昧表現、重複、偏ったフィードバック。
+文体はプロフェッショナルかつ率直で成長を応援するトーン。言語は日本語。
+
+採点ルール（ベース100点から加減算）：
+ペナルティ：求職者の発言を遮った-10点、一方的トーク-15点、ニーズ確認なし求人紹介-10点、条件の話が早すぎた-5点、感情への共感なし-5点、クロージングなし-10点、次回アクション曖昧-5点
+ボーナス：深掘り質問できた+10点、キャリアビジョンを引き出した+15点、求人との紐付け+10点、求職者を次に呼べるクロージング+15点、懸念点の先回り解消+10点、求職者の言葉を使った提案+5点
 
 必ず以下のJSON形式のみで回答すること。他のテキストは一切含めないこと：
 
 {
   "totalScore": <0-100の整数>,
-  "summary": "<一言で全体印象 50文字以内>",
-  "goodPoints": ["<良かった点1>", "<良かった点2>", "<良かった点3>"],
-  "improvements": ["<改善点1>", "<改善点2>", "<改善点3>"],
-  "criticalPoints": ["<致命的改善ポイント1つ>"],
+  "summary": "<全体印象50文字以内>",
+  "goodPoints": ["<タイトル：場面描写。効果的だった理由。伸ばすヒント>", "<同形式>", "<同形式>"],
+  "improvements": ["<タイトル：該当場面。不足点。改善言い回し例>", "<同形式>"],
+  "criticalPoints": ["<タイトル：深刻さ。求職者への影響。即改善行動>"],
   "scriptExample": "<❌現在の言い方\\n\\n✅改善後の言い方>",
-  "topPerformerGap": "<トップ営業との差分の説明>",
+  "topPerformerGap": "<トップ営業との差分>",
   "nextTheme": "<次回改善テーマ（1つ）>",
   "managerComment": "<上司向けコメント>",
   "scores": {
@@ -42,6 +49,17 @@ const SYSTEM_PROMPT = `あなたはトップクラスの営業マネージャー
     "communication": <1-10>,
     "initiative": <1-10>
   },
+  "scoreDetails": [
+    {
+      "category": "<評価カテゴリ名>",
+      "score": <0-100>,
+      "max": 100,
+      "basis": ["<採点根拠1（加減点の理由を具体的に）>", "<根拠2>", "<根拠3>"],
+      "improvements": ["<改善ポイント（台本レベル）1>", "<改善ポイント2>"]
+    }
+  ],
+  "totalBasis": "<総合評価の根拠（採点ルール適用の説明）>",
+  "totalImprovement": "<最優先の改善アクションと次回目標スコア>",
   "kpiImpact": {
     "acceptance": "<承諾率への影響>",
     "application": "<応募率への影響>",
@@ -114,7 +132,7 @@ ${body.transcript}
 
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
+      max_tokens: 3000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });
@@ -131,9 +149,7 @@ ${body.transcript}
 
     const sessionId = `FB-${Date.now().toString().slice(-6)}`;
 
-    // Save to Supabase if configured
     if (isSupabaseConfigured()) {
-      // Look up staff_id by name or use provided staffId
       let staffId = body.staffId ?? null;
       if (!staffId && body.staffName) {
         const { data: staffData } = await supabase
@@ -169,7 +185,6 @@ ${body.transcript}
       if (error) console.error("Supabase save error:", error);
     }
 
-    // Slack alert for low scores
     if (feedback.totalScore <= 60) {
       await notifySlack(
         body.staffName,

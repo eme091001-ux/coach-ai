@@ -4,13 +4,13 @@ export default function LoginPage() {
   const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN ?? null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 w-full max-w-sm p-8 text-center">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "linear-gradient(135deg, #0D2B5E 0%, #1A5BA6 60%, #2E7FC4 100%)" }}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8 text-center">
         {/* Logo */}
-        <div className="w-14 h-14 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
-          <span className="text-white font-bold text-2xl">C</span>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "linear-gradient(135deg, #0D2B5E 0%, #1A5BA6 100%)" }}>
+          <span className="text-white font-bold text-xl tracking-tight">F</span>
         </div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">CoachAI</h1>
+        <h1 className="text-xl font-bold mb-1" style={{ color: "#0D2B5E" }}>Funrix AI Coach</h1>
         <p className="text-sm text-gray-400 mb-8">面談フィードバックAIツール</p>
 
         {/* Google Sign In */}
