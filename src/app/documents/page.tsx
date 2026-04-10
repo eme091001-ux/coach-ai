@@ -261,6 +261,7 @@ interface ParsedDocData {
   postalCode?: string; address?: string; phone?: string; email?: string;
   education?: HistoryRow[]; career?: HistoryRow[]; qualifications?: HistoryRow[];
   motivation?: string; pr?: string; wish?: string;
+  commuteTime?: string; dependents?: string; spouse?: string; spouseSupport?: string;
   summary?: string; companies?: Array<{
     name: string; period: string; industry: string; duties: string; achievements: string;
   }>;
@@ -282,12 +283,19 @@ function DocumentImportModal({
   const processFile = async (file: File) => {
     setLoading(true); setError(""); setParsed(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/documents/parse", { method: "POST", body: fd });
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+      const res = await fetch("/api/documents/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64, mediaType: file.type, fileName: file.name }),
+      });
       const json = await res.json();
       if (json.error) { setError(json.error); return; }
-      setParsed(json.data);
+      // API now returns the parsed object directly (not wrapped in { data: ... })
+      setParsed(json);
     } catch {
       setError("読み込みに失敗しました");
     } finally {
@@ -514,6 +522,10 @@ function ResumeTab({
       if (d.qualifications?.length) { next.licenses = d.qualifications; newAuto.add("licenses"); }
       if (d.motivation) { next.motivation = d.motivation; newAuto.add("motivation"); }
       if (d.wish) { next.wish = d.wish; newAuto.add("wish"); }
+      if (d.commuteTime) { next.commute = d.commuteTime; newAuto.add("commute"); }
+      if (d.dependents) { next.dependents = d.dependents; newAuto.add("dependents"); }
+      if (d.spouse) { next.spouse = d.spouse; newAuto.add("spouse"); }
+      if (d.spouseSupport) { next.spouseDependency = d.spouseSupport; newAuto.add("spouseDependency"); }
       return next;
     });
     setAutoFields(newAuto);
