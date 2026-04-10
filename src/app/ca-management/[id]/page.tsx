@@ -58,251 +58,9 @@ function calcSales(candidates: Candidate[]) {
   return { minS: Math.round(minS), maxS: Math.round(maxS) };
 }
 
-// ── Candidate form constants ───────────────────────────────────────────────────
-const AGES = Array.from({ length: 48 }, (_, i) => i + 18);
-const GENDERS = ["男性", "女性", "その他"];
-const PREFECTURES = ["北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県","茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県","新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県","静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県","徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"];
-const EDUCATIONS = ["中学卒","高校卒","専門学校卒","短大卒","大学卒","大学院卒"];
-const INCOME_OPTIONS = [
-  { label: "100万円未満", value: 50 },
-  ...Array.from({ length: 38 }, (_, i) => ({ label: `${(i + 2) * 50}万円`, value: (i + 2) * 50 })),
-  { label: "2000万円以上", value: 2050 },
-];
-const DESIRED_JOBS_OPTIONS = ["営業","法人営業","個人営業","内勤営業","施工管理","販売","接客","ITエンジニア","起電エンジニア","インフラエンジニア","マーケティング","企画","人事・採用","経理・財務","コンサルタント","マネージャー","その他"];
-
-// ── Modal form helpers (defined at module level to prevent re-mount on render) ─
-const modalInp = (style?: React.CSSProperties): React.CSSProperties => ({
-  width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5",
-  borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box",
-  background: "#fff", ...style,
-});
-function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-// ── Candidate Modal ───────────────────────────────────────────────────────────
-interface CandidateForm {
-  name: string;
-  age: string;
-  gender: string;
-  prefecture: string;
-  education: string;
-  currentIncome: string;
-  desiredIncome: string;
-  desiredJobs: string[];
-  reading: string;
-  phase: string;
-  currentCompany: string;
-  minOffer: string;
-  maxOffer: string;
-  nextAction: string;
-  memo: string;
-}
-
-const defaultForm = (): CandidateForm => ({
-  name: "", age: "", gender: "", prefecture: "", education: "",
-  currentIncome: "", desiredIncome: "", desiredJobs: [],
-  reading: "F", phase: "F 長期保有",
-  currentCompany: "", minOffer: "", maxOffer: "",
-  nextAction: "", memo: "",
-});
-
-function CandidateModal({
-  caId, caName, editing, onClose, onSaved,
-}: {
-  caId: string; caName: string;
-  editing: Candidate | null;
-  onClose: () => void;
-  onSaved: (c: Candidate) => void;
-}) {
-  const [form, setForm] = useState<CandidateForm>(() => {
-    if (editing) return {
-      name: editing.name,
-      age: editing.age?.toString() ?? "",
-      gender: editing.gender ?? "",
-      prefecture: editing.prefecture ?? "",
-      education: editing.education ?? "",
-      currentIncome: editing.currentIncome?.toString() ?? "",
-      desiredIncome: editing.desiredIncome?.toString() ?? "",
-      desiredJobs: editing.desiredJobs ?? [],
-      reading: editing.reading,
-      phase: editing.phase,
-      currentCompany: editing.currentCompany ?? "",
-      minOffer: editing.minOffer?.toString() ?? "",
-      maxOffer: editing.maxOffer?.toString() ?? "",
-      nextAction: editing.nextAction ?? "",
-      memo: editing.memo ?? "",
-    };
-    return defaultForm();
-  });
-  const [saving, setSaving] = useState(false);
-  const needsOffer = ["A", "B", "C"].includes(form.reading);
-
-  const handlePhaseChange = (val: string) => {
-    const opt = PHASE_OPTIONS.find((p) => p.value === val);
-    setForm((f) => ({ ...f, reading: val, phase: opt?.label ?? val }));
-  };
-
-  const toggleJob = (job: string) => {
-    setForm((f) => ({
-      ...f,
-      desiredJobs: f.desiredJobs.includes(job)
-        ? f.desiredJobs.filter((j) => j !== job)
-        : [...f.desiredJobs, job],
-    }));
-  };
-
-  const handleSave = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
-        caId, caName,
-        name: form.name,
-        age: form.age ? parseInt(form.age) : undefined,
-        gender: form.gender || undefined,
-        prefecture: form.prefecture || undefined,
-        education: form.education || undefined,
-        currentIncome: form.currentIncome ? parseInt(form.currentIncome) : undefined,
-        desiredIncome: form.desiredIncome ? parseInt(form.desiredIncome) : undefined,
-        desiredJobs: form.desiredJobs.length > 0 ? form.desiredJobs : undefined,
-        reading: form.reading as Candidate["reading"],
-        phase: form.phase,
-        currentCompany: form.currentCompany || undefined,
-        minOffer: needsOffer && form.minOffer ? parseInt(form.minOffer) : undefined,
-        maxOffer: needsOffer && form.maxOffer ? parseInt(form.maxOffer) : undefined,
-        nextAction: form.nextAction || undefined,
-        memo: form.memo || undefined,
-        targetCompanies: editing?.targetCompanies ?? [],
-      };
-      if (editing) {
-        await updateCandidate(editing.id, payload);
-        onSaved({ ...editing, ...payload });
-      } else {
-        const created = await addCandidate(payload);
-        if (created) onSaved(created);
-        else onSaved({ id: crypto.randomUUID(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
-      }
-    } finally { setSaving(false); onClose(); }
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "92vh", overflowY: "auto", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-          <p style={{ fontWeight: 700, fontSize: 16, color: "#0D2B5E" }}>{editing ? "求職者を編集" : "求職者を追加"}</p>
-          <button onClick={onClose} style={{ color: "#9CAAB8", background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
-        </div>
-
-        {/* 基本情報 */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>基本情報</p>
-        <ModalField label="氏名 *">
-          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" style={modalInp()} />
-        </ModalField>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <ModalField label="年齢">
-            <select value={form.age} onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))} style={modalInp()}>
-              <option value="">選択</option>
-              {AGES.map((a) => <option key={a} value={a}>{a}歳</option>)}
-            </select>
-          </ModalField>
-          <ModalField label="性別">
-            <select value={form.gender} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))} style={modalInp()}>
-              <option value="">選択</option>
-              {GENDERS.map((g) => <option key={g}>{g}</option>)}
-            </select>
-          </ModalField>
-          <ModalField label="最終学歴">
-            <select value={form.education} onChange={(e) => setForm((f) => ({ ...f, education: e.target.value }))} style={modalInp()}>
-              <option value="">選択</option>
-              {EDUCATIONS.map((e) => <option key={e}>{e}</option>)}
-            </select>
-          </ModalField>
-        </div>
-        <ModalField label="現住所（都道府県）">
-          <select value={form.prefecture} onChange={(e) => setForm((f) => ({ ...f, prefecture: e.target.value }))} style={modalInp()}>
-            <option value="">選択</option>
-            {PREFECTURES.map((p) => <option key={p}>{p}</option>)}
-          </select>
-        </ModalField>
-
-        {/* 職歴・希望 */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>職歴・希望</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <ModalField label="現年収">
-            <select value={form.currentIncome} onChange={(e) => setForm((f) => ({ ...f, currentIncome: e.target.value }))} style={modalInp()}>
-              <option value="">選択</option>
-              {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </ModalField>
-          <ModalField label="希望年収">
-            <select value={form.desiredIncome} onChange={(e) => setForm((f) => ({ ...f, desiredIncome: e.target.value }))} style={modalInp()}>
-              <option value="">選択</option>
-              {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </ModalField>
-          <ModalField label="現職">
-            <input value={form.currentCompany} onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))} placeholder="株式会社○○" style={modalInp()} />
-          </ModalField>
-        </div>
-        <ModalField label="希望職種（複数選択可）">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {DESIRED_JOBS_OPTIONS.map((job) => {
-              const checked = form.desiredJobs.includes(job);
-              return (
-                <button key={job} onClick={() => toggleJob(job)} type="button"
-                  style={{ padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", border: checked ? "2px solid #1A5BA6" : "1px solid #C8DFF5", background: checked ? "#EBF5FF" : "#F7FAFF", color: checked ? "#0D2B5E" : "#4A6FA5" }}>
-                  {job}
-                </button>
-              );
-            })}
-          </div>
-        </ModalField>
-
-        {/* 転職活動情報 */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>転職活動情報</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <ModalField label="読み *">
-            <select value={form.reading} onChange={(e) => handlePhaseChange(e.target.value)} style={modalInp()}>
-              {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </ModalField>
-          <ModalField label="ネクストアクション">
-            <select value={form.nextAction} onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value }))} style={modalInp()}>
-              <option value="">選択...</option>
-              {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
-            </select>
-          </ModalField>
-        </div>
-        {needsOffer && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <ModalField label="ミニマム金額（万円）">
-              <input type="number" value={form.minOffer} onChange={(e) => setForm((f) => ({ ...f, minOffer: e.target.value }))} placeholder="500" style={modalInp()} />
-            </ModalField>
-            <ModalField label="マックス金額（万円）">
-              <input type="number" value={form.maxOffer} onChange={(e) => setForm((f) => ({ ...f, maxOffer: e.target.value }))} placeholder="700" style={modalInp()} />
-            </ModalField>
-          </div>
-        )}
-        <ModalField label="メモ">
-          <textarea value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} rows={3} placeholder="自由記述..." style={{ ...modalInp(), resize: "vertical" }} />
-        </ModalField>
-
-        <button onClick={handleSave} disabled={!form.name.trim() || saving}
-          style={{ width: "100%", padding: "11px 0", borderRadius: 8, fontSize: 14, fontWeight: 700, background: form.name.trim() ? "linear-gradient(135deg,#0D2B5E,#1A5BA6)" : "#E0E8F0", color: form.name.trim() ? "#fff" : "#9CAAB8", border: "none", cursor: form.name.trim() ? "pointer" : "not-allowed", marginTop: 4 }}>
-          {saving ? "保存中..." : <><Save size={14} style={{ display: "inline", marginRight: 6 }} />保存する</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Tab 1: Candidates ─────────────────────────────────────────────────────────
+const BLANK_FORM = { name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '' };
+
 function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -310,17 +68,69 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
   const [editing, setEditing] = useState<Candidate | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [candidateForm, setCandidateForm] = useState(BLANK_FORM);
 
   useEffect(() => {
     fetchCandidates(caId).then((cs) => { setCandidates(cs); setLoading(false); });
   }, [caId]);
 
-  const handleSaved = (c: Candidate) => {
-    setCandidates((prev) => {
-      const idx = prev.findIndex((x) => x.id === c.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = c; return next.sort((a, b) => a.reading.localeCompare(b.reading)); }
-      return [...prev, c].sort((a, b) => a.reading.localeCompare(b.reading));
+  const openAdd = () => {
+    setCandidateForm(BLANK_FORM);
+    setEditing(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (c: Candidate) => {
+    setCandidateForm({
+      name: c.name,
+      phase: c.phase,
+      nextAction: c.nextAction ?? '',
+      currentJob: c.currentCompany ?? '',
+      desiredJob: c.desiredJob ?? '',
+      memo: c.memo ?? '',
     });
+    setEditing(c);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditing(null);
+    setCandidateForm(BLANK_FORM);
+  };
+
+  const handleModalSave = async () => {
+    if (!candidateForm.name.trim()) return;
+    setSaving(true);
+    try {
+      const reading = (candidateForm.phase.charAt(0) as Candidate['reading']) || 'F';
+      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
+        caId, caName,
+        name: candidateForm.name,
+        reading,
+        phase: candidateForm.phase,
+        nextAction: candidateForm.nextAction || undefined,
+        currentCompany: candidateForm.currentJob || undefined,
+        desiredJob: candidateForm.desiredJob || undefined,
+        memo: candidateForm.memo || undefined,
+        targetCompanies: editing?.targetCompanies ?? [],
+      };
+      if (editing) {
+        await updateCandidate(editing.id, payload);
+        setCandidates((prev) => {
+          const next = prev.map((c) => c.id === editing.id ? { ...editing, ...payload } : c);
+          return next.sort((a, b) => a.reading.localeCompare(b.reading));
+        });
+      } else {
+        const created = await addCandidate(payload);
+        const newC = created ?? { id: crypto.randomUUID(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        setCandidates((prev) => [...prev, newC].sort((a, b) => a.reading.localeCompare(b.reading)));
+      }
+    } finally {
+      setSaving(false);
+      closeModal();
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -337,6 +147,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
   };
 
   const { minS, maxS } = calcSales(candidates);
+  const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
 
   return (
     <div>
@@ -356,7 +167,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
 
       {/* Add button */}
       <div style={{ marginBottom: 16 }}>
-        <button onClick={() => { setEditing(null); setShowModal(true); }}
+        <button onClick={openAdd}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}>
           <Plus size={14} /> 求職者を追加
         </button>
@@ -418,7 +229,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
                         style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", display: "flex", alignItems: "center", color: "#4A6FA5", textDecoration: "none" }}>
                         <User size={12} />
                       </Link>
-                      <button onClick={() => { setEditing(c); setShowModal(true); }} title="編集"
+                      <button onClick={() => openEdit(c)} title="編集"
                         style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", color: "#4A6FA5" }}>
                         <Edit2 size={12} />
                       </button>
@@ -442,9 +253,91 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
       )}
 
       {showModal && (
-        <CandidateModal caId={caId} caName={caName} editing={editing}
-          onClose={() => { setShowModal(false); setEditing(null); }}
-          onSaved={handleSaved} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: 480, maxHeight: '90vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <p style={{ fontWeight: 700, fontSize: 16, color: '#0D2B5E' }}>{editing ? '求職者を編集' : '求職者を追加'}</p>
+              <button onClick={closeModal} style={{ color: '#9CAAB8', background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>氏名 *</label>
+              <input
+                type="text"
+                value={candidateForm.name}
+                onChange={(e) => setCandidateForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="山田 太郎"
+                style={inpStyle}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>読み</label>
+                <select
+                  value={candidateForm.phase}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, phase: e.target.value }))}
+                  style={inpStyle}
+                >
+                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>ネクストアクション</label>
+                <select
+                  value={candidateForm.nextAction}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, nextAction: e.target.value }))}
+                  style={inpStyle}
+                >
+                  <option value="">選択...</option>
+                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職</label>
+                <input
+                  type="text"
+                  value={candidateForm.currentJob}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, currentJob: e.target.value }))}
+                  placeholder="株式会社○○"
+                  style={inpStyle}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>希望職種</label>
+                <input
+                  type="text"
+                  value={candidateForm.desiredJob}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, desiredJob: e.target.value }))}
+                  placeholder="法人営業"
+                  style={inpStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>メモ</label>
+              <textarea
+                value={candidateForm.memo}
+                onChange={(e) => setCandidateForm(prev => ({ ...prev, memo: e.target.value }))}
+                rows={3}
+                placeholder="自由記述..."
+                style={{ ...inpStyle, resize: 'vertical' }}
+              />
+            </div>
+
+            <button
+              onClick={handleModalSave}
+              disabled={!candidateForm.name.trim() || saving}
+              style={{ width: '100%', padding: '11px 0', borderRadius: 8, fontSize: 14, fontWeight: 700, background: candidateForm.name.trim() ? 'linear-gradient(135deg,#0D2B5E,#1A5BA6)' : '#E0E8F0', color: candidateForm.name.trim() ? '#fff' : '#9CAAB8', border: 'none', cursor: candidateForm.name.trim() ? 'pointer' : 'not-allowed' }}
+            >
+              {saving ? '保存中...' : '保存する'}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
