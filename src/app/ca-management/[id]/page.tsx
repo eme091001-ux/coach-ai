@@ -70,6 +70,21 @@ const INCOME_OPTIONS = [
 ];
 const DESIRED_JOBS_OPTIONS = ["営業","法人営業","個人営業","内勤営業","施工管理","販売","接客","ITエンジニア","起電エンジニア","インフラエンジニア","マーケティング","企画","人事・採用","経理・財務","コンサルタント","マネージャー","その他"];
 
+// ── Modal form helpers (defined at module level to prevent re-mount on render) ─
+const modalInp = (style?: React.CSSProperties): React.CSSProperties => ({
+  width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5",
+  borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box",
+  background: "#fff", ...style,
+});
+function ModalField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
 // ── Candidate Modal ───────────────────────────────────────────────────────────
 interface CandidateForm {
   name: string;
@@ -176,18 +191,6 @@ function CandidateModal({
     } finally { setSaving(false); onClose(); }
   };
 
-  const S = (style?: React.CSSProperties): React.CSSProperties => ({
-    width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5",
-    borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box",
-    ...style,
-  });
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
-      {children}
-    </div>
-  );
-
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#fff", borderRadius: 14, width: 560, maxHeight: "92vh", overflowY: "auto", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
@@ -198,56 +201,56 @@ function CandidateModal({
 
         {/* 基本情報 */}
         <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>基本情報</p>
-        <F label="氏名 *">
-          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" style={S()} />
-        </F>
+        <ModalField label="氏名 *">
+          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="山田 太郎" style={modalInp()} />
+        </ModalField>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <F label="年齢">
-            <select value={form.age} onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))} style={S()}>
+          <ModalField label="年齢">
+            <select value={form.age} onChange={(e) => setForm((f) => ({ ...f, age: e.target.value }))} style={modalInp()}>
               <option value="">選択</option>
               {AGES.map((a) => <option key={a} value={a}>{a}歳</option>)}
             </select>
-          </F>
-          <F label="性別">
-            <select value={form.gender} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))} style={S()}>
+          </ModalField>
+          <ModalField label="性別">
+            <select value={form.gender} onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))} style={modalInp()}>
               <option value="">選択</option>
               {GENDERS.map((g) => <option key={g}>{g}</option>)}
             </select>
-          </F>
-          <F label="最終学歴">
-            <select value={form.education} onChange={(e) => setForm((f) => ({ ...f, education: e.target.value }))} style={S()}>
+          </ModalField>
+          <ModalField label="最終学歴">
+            <select value={form.education} onChange={(e) => setForm((f) => ({ ...f, education: e.target.value }))} style={modalInp()}>
               <option value="">選択</option>
               {EDUCATIONS.map((e) => <option key={e}>{e}</option>)}
             </select>
-          </F>
+          </ModalField>
         </div>
-        <F label="現住所（都道府県）">
-          <select value={form.prefecture} onChange={(e) => setForm((f) => ({ ...f, prefecture: e.target.value }))} style={S()}>
+        <ModalField label="現住所（都道府県）">
+          <select value={form.prefecture} onChange={(e) => setForm((f) => ({ ...f, prefecture: e.target.value }))} style={modalInp()}>
             <option value="">選択</option>
             {PREFECTURES.map((p) => <option key={p}>{p}</option>)}
           </select>
-        </F>
+        </ModalField>
 
         {/* 職歴・希望 */}
         <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>職歴・希望</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-          <F label="現年収">
-            <select value={form.currentIncome} onChange={(e) => setForm((f) => ({ ...f, currentIncome: e.target.value }))} style={S()}>
+          <ModalField label="現年収">
+            <select value={form.currentIncome} onChange={(e) => setForm((f) => ({ ...f, currentIncome: e.target.value }))} style={modalInp()}>
               <option value="">選択</option>
               {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </F>
-          <F label="希望年収">
-            <select value={form.desiredIncome} onChange={(e) => setForm((f) => ({ ...f, desiredIncome: e.target.value }))} style={S()}>
+          </ModalField>
+          <ModalField label="希望年収">
+            <select value={form.desiredIncome} onChange={(e) => setForm((f) => ({ ...f, desiredIncome: e.target.value }))} style={modalInp()}>
               <option value="">選択</option>
               {INCOME_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </F>
-          <F label="現職">
-            <input value={form.currentCompany} onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))} placeholder="株式会社○○" style={S()} />
-          </F>
+          </ModalField>
+          <ModalField label="現職">
+            <input value={form.currentCompany} onChange={(e) => setForm((f) => ({ ...f, currentCompany: e.target.value }))} placeholder="株式会社○○" style={modalInp()} />
+          </ModalField>
         </div>
-        <F label="希望職種（複数選択可）">
+        <ModalField label="希望職種（複数選択可）">
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {DESIRED_JOBS_OPTIONS.map((job) => {
               const checked = form.desiredJobs.includes(job);
@@ -259,36 +262,36 @@ function CandidateModal({
               );
             })}
           </div>
-        </F>
+        </ModalField>
 
         {/* 転職活動情報 */}
         <p style={{ fontSize: 11, fontWeight: 700, color: "#4A6FA5", textTransform: "uppercase", letterSpacing: "0.06em", margin: "16px 0 10px" }}>転職活動情報</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <F label="読み *">
-            <select value={form.reading} onChange={(e) => handlePhaseChange(e.target.value)} style={S()}>
+          <ModalField label="読み *">
+            <select value={form.reading} onChange={(e) => handlePhaseChange(e.target.value)} style={modalInp()}>
               {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
-          </F>
-          <F label="ネクストアクション">
-            <select value={form.nextAction} onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value }))} style={S()}>
+          </ModalField>
+          <ModalField label="ネクストアクション">
+            <select value={form.nextAction} onChange={(e) => setForm((f) => ({ ...f, nextAction: e.target.value }))} style={modalInp()}>
               <option value="">選択...</option>
               {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
             </select>
-          </F>
+          </ModalField>
         </div>
         {needsOffer && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <F label="ミニマム金額（万円）">
-              <input type="number" value={form.minOffer} onChange={(e) => setForm((f) => ({ ...f, minOffer: e.target.value }))} placeholder="500" style={S()} />
-            </F>
-            <F label="マックス金額（万円）">
-              <input type="number" value={form.maxOffer} onChange={(e) => setForm((f) => ({ ...f, maxOffer: e.target.value }))} placeholder="700" style={S()} />
-            </F>
+            <ModalField label="ミニマム金額（万円）">
+              <input type="number" value={form.minOffer} onChange={(e) => setForm((f) => ({ ...f, minOffer: e.target.value }))} placeholder="500" style={modalInp()} />
+            </ModalField>
+            <ModalField label="マックス金額（万円）">
+              <input type="number" value={form.maxOffer} onChange={(e) => setForm((f) => ({ ...f, maxOffer: e.target.value }))} placeholder="700" style={modalInp()} />
+            </ModalField>
           </div>
         )}
-        <F label="メモ">
-          <textarea value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} rows={3} placeholder="自由記述..." style={{ ...S(), resize: "vertical" }} />
-        </F>
+        <ModalField label="メモ">
+          <textarea value={form.memo} onChange={(e) => setForm((f) => ({ ...f, memo: e.target.value }))} rows={3} placeholder="自由記述..." style={{ ...modalInp(), resize: "vertical" }} />
+        </ModalField>
 
         <button onClick={handleSave} disabled={!form.name.trim() || saving}
           style={{ width: "100%", padding: "11px 0", borderRadius: 8, fontSize: 14, fontWeight: 700, background: form.name.trim() ? "linear-gradient(135deg,#0D2B5E,#1A5BA6)" : "#E0E8F0", color: form.name.trim() ? "#fff" : "#9CAAB8", border: "none", cursor: form.name.trim() ? "pointer" : "not-allowed", marginTop: 4 }}>
