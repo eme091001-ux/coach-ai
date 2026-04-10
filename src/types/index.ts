@@ -101,6 +101,7 @@ export interface FeedbackInput {
   staffName: string;
   staffExperience: string;
   candidateName: string;
+  candidateId?: string;
   transcript: string;
   companyPolicy: string;
   managerPolicy: string;

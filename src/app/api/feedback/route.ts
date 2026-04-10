@@ -166,6 +166,7 @@ ${body.transcript}
         meeting_date: body.meetingDate,
         meeting_type: body.meetingType,
         staff_id: staffId,
+        candidate_id: body.candidateId ?? null,
         candidate_name: body.candidateName,
         transcript: body.transcript,
         total_score: feedback.totalScore,

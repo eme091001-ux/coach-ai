@@ -59,79 +59,16 @@ function calcSales(candidates: Candidate[]) {
 }
 
 // ── Tab 1: Candidates ─────────────────────────────────────────────────────────
-const BLANK_FORM = { name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '' };
-
-function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState<Candidate | null>(null);
+function CandidatesTab({ caId, candidates, loading, setCandidates, onAdd, onEdit }: {
+  caId: string;
+  candidates: Candidate[];
+  loading: boolean;
+  setCandidates: React.Dispatch<React.SetStateAction<Candidate[]>>;
+  onAdd: () => void;
+  onEdit: (c: Candidate) => void;
+}) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [candidateForm, setCandidateForm] = useState(BLANK_FORM);
-
-  useEffect(() => {
-    fetchCandidates(caId).then((cs) => { setCandidates(cs); setLoading(false); });
-  }, [caId]);
-
-  const openAdd = () => {
-    setCandidateForm(BLANK_FORM);
-    setEditing(null);
-    setShowModal(true);
-  };
-
-  const openEdit = (c: Candidate) => {
-    setCandidateForm({
-      name: c.name,
-      phase: c.phase,
-      nextAction: c.nextAction ?? '',
-      currentJob: c.currentCompany ?? '',
-      desiredJob: c.desiredJob ?? '',
-      memo: c.memo ?? '',
-    });
-    setEditing(c);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setEditing(null);
-    setCandidateForm(BLANK_FORM);
-  };
-
-  const handleModalSave = async () => {
-    if (!candidateForm.name.trim()) return;
-    setSaving(true);
-    try {
-      const reading = (candidateForm.phase.charAt(0) as Candidate['reading']) || 'F';
-      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
-        caId, caName,
-        name: candidateForm.name,
-        reading,
-        phase: candidateForm.phase,
-        nextAction: candidateForm.nextAction || undefined,
-        currentCompany: candidateForm.currentJob || undefined,
-        desiredJob: candidateForm.desiredJob || undefined,
-        memo: candidateForm.memo || undefined,
-        targetCompanies: editing?.targetCompanies ?? [],
-      };
-      if (editing) {
-        await updateCandidate(editing.id, payload);
-        setCandidates((prev) => {
-          const next = prev.map((c) => c.id === editing.id ? { ...editing, ...payload } : c);
-          return next.sort((a, b) => a.reading.localeCompare(b.reading));
-        });
-      } else {
-        const created = await addCandidate(payload);
-        const newC = created ?? { id: crypto.randomUUID(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        setCandidates((prev) => [...prev, newC].sort((a, b) => a.reading.localeCompare(b.reading)));
-      }
-    } finally {
-      setSaving(false);
-      closeModal();
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("この求職者を削除しますか？")) return;
@@ -147,7 +84,6 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
   };
 
   const { minS, maxS } = calcSales(candidates);
-  const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
 
   return (
     <div>
@@ -167,7 +103,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
 
       {/* Add button */}
       <div style={{ marginBottom: 16 }}>
-        <button onClick={openAdd}
+        <button onClick={onAdd}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}>
           <Plus size={14} /> 求職者を追加
         </button>
@@ -229,7 +165,7 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
                         style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", display: "flex", alignItems: "center", color: "#4A6FA5", textDecoration: "none" }}>
                         <User size={12} />
                       </Link>
-                      <button onClick={() => openEdit(c)} title="編集"
+                      <button onClick={() => onEdit(c)} title="編集"
                         style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", color: "#4A6FA5" }}>
                         <Edit2 size={12} />
                       </button>
@@ -249,94 +185,6 @@ function CandidatesTab({ caId, caName }: { caId: string; caName: string }) {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {showModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: '#fff', borderRadius: 14, width: 480, maxHeight: '90vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <p style={{ fontWeight: 700, fontSize: 16, color: '#0D2B5E' }}>{editing ? '求職者を編集' : '求職者を追加'}</p>
-              <button onClick={closeModal} style={{ color: '#9CAAB8', background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>氏名 *</label>
-              <input
-                type="text"
-                value={candidateForm.name}
-                onChange={(e) => setCandidateForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="山田 太郎"
-                style={inpStyle}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>読み</label>
-                <select
-                  value={candidateForm.phase}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, phase: e.target.value }))}
-                  style={inpStyle}
-                >
-                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>ネクストアクション</label>
-                <select
-                  value={candidateForm.nextAction}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, nextAction: e.target.value }))}
-                  style={inpStyle}
-                >
-                  <option value="">選択...</option>
-                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職</label>
-                <input
-                  type="text"
-                  value={candidateForm.currentJob}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, currentJob: e.target.value }))}
-                  placeholder="株式会社○○"
-                  style={inpStyle}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>希望職種</label>
-                <input
-                  type="text"
-                  value={candidateForm.desiredJob}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, desiredJob: e.target.value }))}
-                  placeholder="法人営業"
-                  style={inpStyle}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>メモ</label>
-              <textarea
-                value={candidateForm.memo}
-                onChange={(e) => setCandidateForm(prev => ({ ...prev, memo: e.target.value }))}
-                rows={3}
-                placeholder="自由記述..."
-                style={{ ...inpStyle, resize: 'vertical' }}
-              />
-            </div>
-
-            <button
-              onClick={handleModalSave}
-              disabled={!candidateForm.name.trim() || saving}
-              style={{ width: '100%', padding: '11px 0', borderRadius: 8, fontSize: 14, fontWeight: 700, background: candidateForm.name.trim() ? 'linear-gradient(135deg,#0D2B5E,#1A5BA6)' : '#E0E8F0', color: candidateForm.name.trim() ? '#fff' : '#9CAAB8', border: 'none', cursor: candidateForm.name.trim() ? 'pointer' : 'not-allowed' }}
-            >
-              {saving ? '保存中...' : '保存する'}
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -981,11 +829,75 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   const [ca, setCA] = useState<Staff | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("candidates");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<Candidate | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [candidateForm, setCandidateForm] = useState({ name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '' });
+  const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
 
   useEffect(() => {
     fetchStaffById(id).then(setCA);
-    fetchCandidates(id).then(setCandidates);
+    fetchCandidates(id).then((cs) => { setCandidates(cs); setCandidatesLoading(false); });
   }, [id]);
+
+  const openAdd = () => {
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '' });
+    setEditing(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (c: Candidate) => {
+    setCandidateForm({
+      name: c.name,
+      phase: c.phase,
+      nextAction: c.nextAction ?? '',
+      currentJob: c.currentCompany ?? '',
+      desiredJob: c.desiredJob ?? '',
+      memo: c.memo ?? '',
+    });
+    setEditing(c);
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditing(null);
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJob: '', desiredJob: '', memo: '' });
+  };
+
+  const handleModalSave = async () => {
+    if (!candidateForm.name.trim()) return;
+    setSaving(true);
+    try {
+      const reading = (candidateForm.phase.charAt(0) as Candidate['reading']) || 'F';
+      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
+        caId: id, caName: ca?.name ?? '',
+        name: candidateForm.name,
+        reading,
+        phase: candidateForm.phase,
+        nextAction: candidateForm.nextAction || undefined,
+        currentCompany: candidateForm.currentJob || undefined,
+        desiredJob: candidateForm.desiredJob || undefined,
+        memo: candidateForm.memo || undefined,
+        targetCompanies: editing?.targetCompanies ?? [],
+      };
+      if (editing) {
+        await updateCandidate(editing.id, payload);
+        setCandidates((prev) => {
+          const next = prev.map((c) => c.id === editing.id ? { ...editing, ...payload } : c);
+          return next.sort((a, b) => a.reading.localeCompare(b.reading));
+        });
+      } else {
+        const created = await addCandidate(payload);
+        const newC = created ?? { id: crypto.randomUUID(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+        setCandidates((prev) => [...prev, newC].sort((a, b) => a.reading.localeCompare(b.reading)));
+      }
+    } finally {
+      setSaving(false);
+      closeModal();
+    }
+  };
 
   const avatarColor = { bg: "#DBEAFE", text: "#1E40AF" };
 
@@ -1018,11 +930,100 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* Tab content */}
-      {activeTab === "candidates" && <CandidatesTab caId={id} caName={ca?.name ?? ""} />}
+      {activeTab === "candidates" && <CandidatesTab caId={id} candidates={candidates} loading={candidatesLoading} setCandidates={setCandidates} onAdd={openAdd} onEdit={openEdit} />}
       {activeTab === "feedback"   && <FeedbackHistoryTab caId={id} />}
       {activeTab === "documents"  && <DocumentsTab caId={id} />}
       {activeTab === "entries"    && <EntryRequestsTab caId={id} caName={ca?.name ?? ""} candidates={candidates} />}
       {activeTab === "reports"    && <DailyReportsTab caId={id} caName={ca?.name ?? ""} candidates={candidates} />}
+
+      {/* Candidate Modal — rendered at page level so candidateForm state changes never remount the inputs */}
+      {showModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 14, width: 480, maxHeight: '90vh', overflowY: 'auto', padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <p style={{ fontWeight: 700, fontSize: 16, color: '#0D2B5E' }}>{editing ? '求職者を編集' : '求職者を追加'}</p>
+              <button onClick={closeModal} style={{ color: '#9CAAB8', background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>氏名 *</label>
+              <input
+                type="text"
+                value={candidateForm.name}
+                onChange={(e) => setCandidateForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="山田 太郎"
+                style={inpStyle}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>読み</label>
+                <select
+                  value={candidateForm.phase}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, phase: e.target.value }))}
+                  style={inpStyle}
+                >
+                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>ネクストアクション</label>
+                <select
+                  value={candidateForm.nextAction}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, nextAction: e.target.value }))}
+                  style={inpStyle}
+                >
+                  <option value="">選択...</option>
+                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職</label>
+                <input
+                  type="text"
+                  value={candidateForm.currentJob}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, currentJob: e.target.value }))}
+                  placeholder="株式会社○○"
+                  style={inpStyle}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>希望職種</label>
+                <input
+                  type="text"
+                  value={candidateForm.desiredJob}
+                  onChange={(e) => setCandidateForm(prev => ({ ...prev, desiredJob: e.target.value }))}
+                  placeholder="法人営業"
+                  style={inpStyle}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>メモ</label>
+              <textarea
+                value={candidateForm.memo}
+                onChange={(e) => setCandidateForm(prev => ({ ...prev, memo: e.target.value }))}
+                rows={3}
+                placeholder="自由記述..."
+                style={{ ...inpStyle, resize: 'vertical' }}
+              />
+            </div>
+
+            <button
+              onClick={handleModalSave}
+              disabled={!candidateForm.name.trim() || saving}
+              style={{ width: '100%', padding: '11px 0', borderRadius: 8, fontSize: 14, fontWeight: 700, background: candidateForm.name.trim() ? 'linear-gradient(135deg,#0D2B5E,#1A5BA6)' : '#E0E8F0', color: candidateForm.name.trim() ? '#fff' : '#9CAAB8', border: 'none', cursor: candidateForm.name.trim() ? 'pointer' : 'not-allowed' }}
+            >
+              {saving ? '保存中...' : '保存する'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
