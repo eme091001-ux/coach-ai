@@ -461,7 +461,7 @@ export interface EntryRequest {
   careerUrl?: string;
   recommendation?: string;
   interviewDates?: string[];
-  status: 'pending' | 'entered' | 'adjusting' | 'confirmed' | 'stopped';
+  status: 'pending' | 'entered' | 'adjusting' | 'confirmed' | 'done' | 'stopped';
   createdAt: string;
   updatedAt: string;
 }
@@ -532,4 +532,157 @@ export async function updateEntryStatus(
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', id);
   return !error;
+}
+
+// ── All Candidates (for CA management summary) ────────────────────────────────
+
+export async function fetchAllCandidates(): Promise<Candidate[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('candidates')
+    .select('*')
+    .order('reading', { ascending: true });
+  if (error || !data) return [];
+  return data.map(mapDbCandidateToApp);
+}
+
+// ── Daily Reports ─────────────────────────────────────────────────────────────
+
+export interface DailyReport {
+  id: string;
+  caId: string;
+  caName?: string;
+  reportDate: string;
+  newInterviews: number;
+  offersMade: number;
+  entriesMade: number;
+  revenueConfirmed: number;
+  memo?: string;
+  createdAt: string;
+}
+
+function mapDbDailyReportToApp(row: Record<string, unknown>): DailyReport {
+  return {
+    id: row.id as string,
+    caId: row.ca_id as string,
+    caName: row.ca_name as string | undefined,
+    reportDate: row.report_date as string,
+    newInterviews: (row.new_interviews as number) ?? 0,
+    offersMade: (row.offers_made as number) ?? 0,
+    entriesMade: (row.entries_made as number) ?? 0,
+    revenueConfirmed: (row.revenue_confirmed as number) ?? 0,
+    memo: row.memo as string | undefined,
+    createdAt: row.created_at as string,
+  };
+}
+
+export async function fetchDailyReports(caId: string): Promise<DailyReport[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('daily_reports')
+    .select('*')
+    .eq('ca_id', caId)
+    .order('report_date', { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapDbDailyReportToApp);
+}
+
+export async function addDailyReport(
+  report: Omit<DailyReport, 'id' | 'createdAt'>
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('daily_reports')
+    .insert({
+      ca_id: report.caId,
+      ca_name: report.caName ?? null,
+      report_date: report.reportDate,
+      new_interviews: report.newInterviews,
+      offers_made: report.offersMade,
+      entries_made: report.entriesMade,
+      revenue_confirmed: report.revenueConfirmed,
+      memo: report.memo ?? null,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return null;
+  return data.id as string;
+}
+
+// ── Monthly Forecasts ─────────────────────────────────────────────────────────
+
+export interface MonthlyForecast {
+  id: string;
+  caId: string;
+  caName?: string;
+  year: number;
+  month: number;
+  forecastMin: number;
+  forecastMax: number;
+  actualRevenue: number;
+  memo?: string;
+  updatedAt: string;
+}
+
+function mapDbForecastToApp(row: Record<string, unknown>): MonthlyForecast {
+  return {
+    id: row.id as string,
+    caId: row.ca_id as string,
+    caName: row.ca_name as string | undefined,
+    year: row.year as number,
+    month: row.month as number,
+    forecastMin: (row.forecast_min as number) ?? 0,
+    forecastMax: (row.forecast_max as number) ?? 0,
+    actualRevenue: (row.actual_revenue as number) ?? 0,
+    memo: row.memo as string | undefined,
+    updatedAt: row.updated_at as string,
+  };
+}
+
+export async function fetchMonthlyForecast(
+  caId: string, year: number, month: number
+): Promise<MonthlyForecast | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('monthly_forecasts')
+    .select('*')
+    .eq('ca_id', caId)
+    .eq('year', year)
+    .eq('month', month)
+    .single();
+  if (error || !data) return null;
+  return mapDbForecastToApp(data);
+}
+
+export async function upsertMonthlyForecast(
+  forecast: Omit<MonthlyForecast, 'id' | 'updatedAt'>
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase
+    .from('monthly_forecasts')
+    .upsert({
+      ca_id: forecast.caId,
+      ca_name: forecast.caName ?? null,
+      year: forecast.year,
+      month: forecast.month,
+      forecast_min: forecast.forecastMin,
+      forecast_max: forecast.forecastMax,
+      actual_revenue: forecast.actualRevenue,
+      memo: forecast.memo ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'ca_id,year,month' });
+  return !error;
+}
+
+export async function fetchAllMonthlyForecasts(
+  year: number, month: number
+): Promise<MonthlyForecast[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('monthly_forecasts')
+    .select('*')
+    .eq('year', year)
+    .eq('month', month);
+  if (error || !data) return [];
+  return data.map(mapDbForecastToApp);
 }

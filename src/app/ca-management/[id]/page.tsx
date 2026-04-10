@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import {
   fetchStaffById, fetchCandidates, addCandidate, updateCandidate, deleteCandidate,
   fetchFeedbackSessionsFiltered, fetchDocuments, fetchEntryRequests, addEntryRequest,
-  Candidate, CandidateDocument, EntryRequest,
+  fetchDailyReports, addDailyReport, fetchMonthlyForecast, upsertMonthlyForecast,
+  Candidate, CandidateDocument, EntryRequest, DailyReport, MonthlyForecast,
 } from "@/lib/db";
 import { Staff, FeedbackSession } from "@/types";
 import {
   ChevronLeft, Plus, Trash2, Edit2, X, Save, FileText, Briefcase,
-  Target, FolderOpen, ClipboardList,
+  Target, FolderOpen, ClipboardList, TrendingUp, ChevronDown, ChevronUp,
 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -605,14 +606,298 @@ function EntryRequestsTab({ caId, caName, candidates }: { caId: string; caName: 
   );
 }
 
+// ── Tab 5: Daily Reports & Forecast ──────────────────────────────────────────
+function DailyReportsTab({ caId, caName, candidates }: { caId: string; caName: string; candidates: Candidate[] }) {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+  const todayStr = now.toISOString().slice(0, 10);
+
+  const [reports, setReports] = useState<DailyReport[]>([]);
+  const [forecast, setForecast] = useState<MonthlyForecast | null>(null);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [viewMonth, setViewMonth] = useState(`${curYear}-${String(curMonth).padStart(2, "0")}`);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Daily report form
+  const [drForm, setDrForm] = useState({
+    reportDate: todayStr,
+    newInterviews: "",
+    offersMade: "",
+    entriesMade: "",
+    revenueConfirmed: "",
+    memo: "",
+  });
+  const [drSaving, setDrSaving] = useState(false);
+  const [drSuccess, setDrSuccess] = useState(false);
+
+  // Monthly forecast form
+  const [fcForm, setFcForm] = useState({ forecastMin: "", forecastMax: "", actualRevenue: "", memo: "" });
+  const [fcSaving, setFcSaving] = useState(false);
+  const [fcSuccess, setFcSuccess] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetchDailyReports(caId),
+      fetchMonthlyForecast(caId, curYear, curMonth),
+    ]).then(([rpts, fc]) => {
+      setReports(rpts);
+      if (fc) {
+        setForecast(fc);
+        setFcForm({
+          forecastMin: fc.forecastMin?.toString() ?? "",
+          forecastMax: fc.forecastMax?.toString() ?? "",
+          actualRevenue: fc.actualRevenue?.toString() ?? "",
+          memo: fc.memo ?? "",
+        });
+      }
+      setLoadingReports(false);
+    });
+  }, [caId, curYear, curMonth]);
+
+  // Monthly summary from candidates
+  const { minS, maxS } = calcSales(candidates);
+  const confirmedSales = candidates
+    .filter((c) => c.reading === "A")
+    .reduce((sum, c) => sum + (c.maxOffer ?? 0), 0);
+
+  const handleDrSubmit = async () => {
+    setDrSaving(true);
+    const id = await addDailyReport({
+      caId, caName,
+      reportDate: drForm.reportDate,
+      newInterviews: parseInt(drForm.newInterviews) || 0,
+      offersMade: parseInt(drForm.offersMade) || 0,
+      entriesMade: parseInt(drForm.entriesMade) || 0,
+      revenueConfirmed: parseInt(drForm.revenueConfirmed) || 0,
+      memo: drForm.memo || undefined,
+    });
+    if (id) {
+      const newRpt: DailyReport = {
+        id,
+        caId, caName,
+        reportDate: drForm.reportDate,
+        newInterviews: parseInt(drForm.newInterviews) || 0,
+        offersMade: parseInt(drForm.offersMade) || 0,
+        entriesMade: parseInt(drForm.entriesMade) || 0,
+        revenueConfirmed: parseInt(drForm.revenueConfirmed) || 0,
+        memo: drForm.memo || undefined,
+        createdAt: new Date().toISOString(),
+      };
+      setReports((prev) => [newRpt, ...prev]);
+    }
+    setDrForm({ reportDate: todayStr, newInterviews: "", offersMade: "", entriesMade: "", revenueConfirmed: "", memo: "" });
+    setDrSaving(false);
+    setDrSuccess(true);
+    setTimeout(() => setDrSuccess(false), 3000);
+  };
+
+  const handleFcSave = async () => {
+    setFcSaving(true);
+    await upsertMonthlyForecast({
+      caId, caName,
+      year: curYear, month: curMonth,
+      forecastMin: parseInt(fcForm.forecastMin) || 0,
+      forecastMax: parseInt(fcForm.forecastMax) || 0,
+      actualRevenue: parseInt(fcForm.actualRevenue) || 0,
+      memo: fcForm.memo || undefined,
+    });
+    setFcSaving(false);
+    setFcSuccess(true);
+    setTimeout(() => setFcSuccess(false), 3000);
+  };
+
+  const filteredReports = reports.filter((r) => r.reportDate.startsWith(viewMonth));
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5",
+    borderRadius: 6, fontSize: 13, color: "#0D2B5E", outline: "none", boxSizing: "border-box",
+  };
+
+  if (loadingReports) return <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Monthly summary cards ── */}
+      <div>
+        <p style={{ fontSize: 12, fontWeight: 700, color: "#4A6FA5", marginBottom: 10 }}>
+          当月サマリー（{curYear}年{curMonth}月）
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          {[
+            { label: "当月ミニマム見込み", value: `${minS.toLocaleString()}万円`, color: "#1A5BA6" },
+            { label: "当月マックス見込み", value: `${maxS.toLocaleString()}万円`, color: "#166534" },
+            { label: "確定売上（A読み）",  value: `${confirmedSales.toLocaleString()}万円`, color: "#991B1B" },
+            { label: "保有求職者数",        value: `${candidates.length}名`, color: "#0D2B5E" },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px" }}>
+              <p style={{ fontSize: 10, color: "#9CAAB8", marginBottom: 6 }}>{label}</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color }}>{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Monthly forecast form ── */}
+      <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E", marginBottom: 16 }}>
+          📊 {curYear}年{curMonth}月の見込み入力
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 12 }}>
+          {[
+            { label: "見込みミニマム（万円）", key: "forecastMin" },
+            { label: "見込みマックス（万円）", key: "forecastMax" },
+            { label: "確定売上（万円）",        key: "actualRevenue" },
+          ].map(({ label, key }) => (
+            <div key={key}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
+              <input
+                type="number"
+                value={fcForm[key as keyof typeof fcForm]}
+                onChange={(e) => setFcForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder="0"
+                style={inputStyle}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>メモ</label>
+          <textarea
+            value={fcForm.memo}
+            onChange={(e) => setFcForm((f) => ({ ...f, memo: e.target.value }))}
+            rows={2}
+            placeholder="メモを入力..."
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={handleFcSave}
+            disabled={fcSaving}
+            style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}
+          >
+            {fcSaving ? "保存中..." : "保存する"}
+          </button>
+          {fcSuccess && <span style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>✓ 保存しました</span>}
+        </div>
+      </div>
+
+      {/* ── Daily report form ── */}
+      <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E", marginBottom: 16 }}>📝 日報を入力</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+          {[
+            { label: "日付", key: "reportDate", type: "date" },
+            { label: "新規面談件数", key: "newInterviews", type: "number" },
+            { label: "内定・オファー件数", key: "offersMade", type: "number" },
+            { label: "エントリー件数", key: "entriesMade", type: "number" },
+            { label: "売上確定（万円）", key: "revenueConfirmed", type: "number" },
+          ].map(({ label, key, type }) => (
+            <div key={key}>
+              <label style={{ fontSize: 10, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>{label}</label>
+              <input
+                type={type}
+                value={drForm[key as keyof typeof drForm]}
+                onChange={(e) => setDrForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder={type === "number" ? "0" : ""}
+                style={inputStyle}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5", display: "block", marginBottom: 4 }}>今日のメモ・気づき</label>
+          <textarea
+            value={drForm.memo}
+            onChange={(e) => setDrForm((f) => ({ ...f, memo: e.target.value }))}
+            rows={3}
+            placeholder="今日の気づきや所感を入力..."
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={handleDrSubmit}
+            disabled={drSaving}
+            style={{ padding: "9px 24px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}
+          >
+            {drSaving ? "送信中..." : "日報を提出"}
+          </button>
+          {drSuccess && <span style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>✓ 提出しました</span>}
+        </div>
+      </div>
+
+      {/* ── Past reports ── */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E" }}>過去の日報</p>
+          <input
+            type="month"
+            value={viewMonth}
+            onChange={(e) => setViewMonth(e.target.value)}
+            style={{ padding: "5px 8px", border: "1px solid #C8DFF5", borderRadius: 6, fontSize: 12, color: "#0D2B5E" }}
+          />
+          <span style={{ fontSize: 11, color: "#9CAAB8" }}>{filteredReports.length}件</span>
+        </div>
+
+        {filteredReports.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12 }}>
+            <p style={{ fontSize: 13, color: "#9CAAB8" }}>この月の日報がありません</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {filteredReports.map((r) => {
+              const isOpen = expandedId === r.id;
+              return (
+                <div key={r.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, overflow: "hidden" }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", cursor: "pointer" }}
+                    onClick={() => setExpandedId(isOpen ? null : r.id)}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#4A6FA5", flexShrink: 0 }}>{r.reportDate}</span>
+                    <div style={{ display: "flex", gap: 16, flex: 1 }}>
+                      {[
+                        ["新規面談", r.newInterviews],
+                        ["オファー", r.offersMade],
+                        ["エントリー", r.entriesMade],
+                        ["確定売上", `${r.revenueConfirmed}万円`],
+                      ].map(([label, val]) => (
+                        <span key={label as string} style={{ fontSize: 12, color: "#0D2B5E" }}>
+                          <span style={{ color: "#9CAAB8" }}>{label}:</span> <b>{val}</b>
+                        </span>
+                      ))}
+                    </div>
+                    {r.memo
+                      ? isOpen ? <ChevronUp size={14} color="#9CAAB8" /> : <ChevronDown size={14} color="#9CAAB8" />
+                      : <span style={{ width: 14 }} />
+                    }
+                  </div>
+                  {isOpen && r.memo && (
+                    <div style={{ padding: "0 16px 12px", borderTop: "1px solid #EBF2FC" }}>
+                      <p style={{ fontSize: 12, color: "#4A6FA5", marginTop: 8, whiteSpace: "pre-wrap" }}>{r.memo}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
-type TabKey = "candidates" | "feedback" | "documents" | "entries";
+type TabKey = "candidates" | "feedback" | "documents" | "entries" | "reports";
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: "candidates", label: "👤 保有求職者リスト", icon: null },
   { key: "feedback",   label: "🗂 面談履歴",        icon: null },
   { key: "documents",  label: "📄 書類管理",         icon: null },
   { key: "entries",    label: "📋 エントリー依頼",   icon: null },
+  { key: "reports",    label: "📊 日報・見込み",     icon: null },
 ];
 
 export default function CADetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -661,6 +946,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
       {activeTab === "feedback"   && <FeedbackHistoryTab caId={id} />}
       {activeTab === "documents"  && <DocumentsTab caId={id} />}
       {activeTab === "entries"    && <EntryRequestsTab caId={id} caName={ca?.name ?? ""} candidates={candidates} />}
+      {activeTab === "reports"    && <DailyReportsTab caId={id} caName={ca?.name ?? ""} candidates={candidates} />}
     </div>
   );
 }

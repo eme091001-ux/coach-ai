@@ -1,7 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchStaff, fetchFeedbackSessions } from "@/lib/db";
+import {
+  fetchStaff, fetchFeedbackSessions, fetchAllCandidates,
+  fetchAllMonthlyForecasts, Candidate, MonthlyForecast,
+} from "@/lib/db";
 import { Staff, FeedbackSession } from "@/types";
 import { Plus, Loader2, X, ChevronRight } from "lucide-react";
 
@@ -13,33 +16,70 @@ const AVATAR_COLORS = [
 
 function initials(name: string) { return name.replace(/\s+/g, "").slice(0, 2); }
 
+function calcSalesForCA(candidates: Candidate[]) {
+  let minS = 0, maxS = 0, confirmed = 0;
+  for (const c of candidates) {
+    const min = c.minOffer ?? 0;
+    const max = c.maxOffer ?? 0;
+    if (c.reading === "A") { minS += max; maxS += max; confirmed += max; }
+    else if (c.reading === "B") { minS += max * 0.9; maxS += max * 0.9; }
+    else if (c.reading === "C") { minS += min * 0.7; maxS += max * 0.7; }
+  }
+  return { minS: Math.round(minS), maxS: Math.round(maxS), confirmed: Math.round(confirmed) };
+}
+
 export default function CAManagementPage() {
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [stats, setStats] = useState<Record<string, { count: number; avg: number }>>({});
+  const [candidatesByCA, setCandidatesByCA] = useState<Record<string, Candidate[]>>({});
+  const [forecastsByCA, setForecastsByCA] = useState<Record<string, MonthlyForecast>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", experience: "1〜2年", role: "CA", email: "" });
 
   useEffect(() => {
-    Promise.all([fetchStaff(), fetchFeedbackSessions()]).then(
-      ([staffs, sessions]: [Staff[], FeedbackSession[]]) => {
-        setStaffList(staffs);
-        const map: Record<string, { count: number; avg: number }> = {};
-        for (const s of staffs) {
-          const ss = sessions.filter((f) => f.staffId === s.id || (!f.staffId && f.staffName === s.name));
-          map[s.id] = { count: ss.length, avg: ss.length ? Math.round(ss.reduce((a, f) => a + f.totalScore, 0) / ss.length) : 0 };
-        }
-        setStats(map);
+    Promise.all([
+      fetchStaff(),
+      fetchFeedbackSessions(),
+      fetchAllCandidates(),
+      fetchAllMonthlyForecasts(curYear, curMonth),
+    ]).then(([staffs, sessions, allCandidates, forecasts]) => {
+      setStaffList(staffs as Staff[]);
+
+      // Session stats per CA
+      const map: Record<string, { count: number; avg: number }> = {};
+      for (const s of staffs as Staff[]) {
+        const ss = (sessions as FeedbackSession[]).filter((f) => f.staffId === s.id || (!f.staffId && f.staffName === s.name));
+        map[s.id] = { count: ss.length, avg: ss.length ? Math.round(ss.reduce((a, f) => a + f.totalScore, 0) / ss.length) : 0 };
       }
-    ).finally(() => setLoading(false));
-  }, []);
+      setStats(map);
+
+      // Candidates per CA
+      const cbCA: Record<string, Candidate[]> = {};
+      for (const c of allCandidates as Candidate[]) {
+        if (!cbCA[c.caId]) cbCA[c.caId] = [];
+        cbCA[c.caId].push(c);
+      }
+      setCandidatesByCA(cbCA);
+
+      // Forecasts per CA (keyed by caId)
+      const fcMap: Record<string, MonthlyForecast> = {};
+      for (const f of forecasts as MonthlyForecast[]) {
+        fcMap[f.caId] = f;
+      }
+      setForecastsByCA(fcMap);
+    }).finally(() => setLoading(false));
+  }, [curYear, curMonth]);
 
   const handleAdd = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const color = AVATAR_COLORS[staffList.length % AVATAR_COLORS.length];
       const res = await fetch("/api/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -52,6 +92,31 @@ export default function CAManagementPage() {
       setShowModal(false);
     } catch { /* noop */ } finally { setSaving(false); }
   };
+
+  // Summary table rows
+  const summaryRows = staffList.map((s) => {
+    const cands = candidatesByCA[s.id] ?? [];
+    const { minS, maxS, confirmed } = calcSalesForCA(cands);
+    const fc = forecastsByCA[s.id];
+    return {
+      id: s.id,
+      name: s.name,
+      candidateCount: cands.length,
+      confirmed,
+      forecastMin: fc?.forecastMin ?? minS,
+      forecastMax: fc?.forecastMax ?? maxS,
+    };
+  });
+
+  const totals = summaryRows.reduce(
+    (acc, r) => ({
+      candidateCount: acc.candidateCount + r.candidateCount,
+      confirmed: acc.confirmed + r.confirmed,
+      forecastMin: acc.forecastMin + r.forecastMin,
+      forecastMax: acc.forecastMax + r.forecastMax,
+    }),
+    { candidateCount: 0, confirmed: 0, forecastMin: 0, forecastMax: 0 }
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#F3F7FC", padding: "28px 28px 60px" }}>
@@ -71,46 +136,102 @@ export default function CAManagementPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
           <Loader2 size={24} style={{ color: "#3B8FD4", animation: "spin 1s linear infinite" }} />
         </div>
-      ) : staffList.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, color: "#9CAAB8" }}>
-          <p style={{ fontSize: 14 }}>CAメンバーが登録されていません</p>
-        </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
-          {staffList.map((s, idx) => {
-            const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-            const st = stats[s.id] ?? { count: 0, avg: 0 };
-            return (
-              <Link key={s.id} href={`/ca-management/${s.id}`} style={{ textDecoration: "none" }}>
-                <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, cursor: "pointer", transition: "all 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3B8FD4"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(59,143,212,0.15)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#C8DFF5"; e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)"; }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 12, background: color.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, color: color.text, flexShrink: 0 }}>
-                      {initials(s.name)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{s.name}</p>
-                      <p style={{ fontSize: 11, color: "#9CAAB8", marginTop: 1 }}>{s.experience} · {s.role}</p>
-                    </div>
-                    <ChevronRight size={16} color="#C8DFF5" />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    {[
-                      ["面談数", `${st.count}件`],
-                      ["平均スコア", st.avg > 0 ? `${st.avg}点` : "—"],
-                    ].map(([label, val]) => (
-                      <div key={label} style={{ background: "#F7FAFF", borderRadius: 8, padding: "8px 12px" }}>
-                        <p style={{ fontSize: 10, color: "#9CAAB8", marginBottom: 2 }}>{label}</p>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{val}</p>
-                      </div>
+        <>
+          {/* ── Monthly forecast summary table ── */}
+          {staffList.length > 0 && (
+            <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, overflow: "hidden", marginBottom: 28 }}>
+              <div style={{ padding: "14px 20px", background: "#F7FAFF", borderBottom: "1px solid #C8DFF5" }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E" }}>
+                  {curYear}年{curMonth}月 売上サマリー
+                </p>
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #EBF2FC" }}>
+                    {["CA名", "保有求職者数", "確定売上", "ミニマム見込み", "マックス見込み"].map((h) => (
+                      <th key={h} style={{ padding: "10px 18px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#4A6FA5" }}>{h}</th>
                     ))}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summaryRows.map((r) => (
+                    <tr key={r.id} style={{ borderBottom: "1px solid #EBF2FC" }}>
+                      <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 600, color: "#0D2B5E" }}>
+                        <Link href={`/ca-management/${r.id}`} style={{ color: "#0D2B5E", textDecoration: "none" }}>
+                          {r.name}
+                        </Link>
+                      </td>
+                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#4A6FA5" }}>{r.candidateCount}名</td>
+                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#4A6FA5" }}>
+                        {r.confirmed > 0 ? <span style={{ color: "#991B1B", fontWeight: 600 }}>{r.confirmed.toLocaleString()}万円</span> : "—"}
+                      </td>
+                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#166534" }}>{r.forecastMin > 0 ? `${r.forecastMin.toLocaleString()}万円` : "—"}</td>
+                      <td style={{ padding: "11px 18px", fontSize: 13, color: "#166534" }}>{r.forecastMax > 0 ? `${r.forecastMax.toLocaleString()}万円` : "—"}</td>
+                    </tr>
+                  ))}
+                  {/* Totals row */}
+                  <tr style={{ background: "#E8F2FC", borderTop: "2px solid #C8DFF5" }}>
+                    <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 800, color: "#0D2B5E" }}>合計</td>
+                    <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 700, color: "#0D2B5E" }}>{totals.candidateCount}名</td>
+                    <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 700, color: "#991B1B" }}>
+                      {totals.confirmed > 0 ? `${totals.confirmed.toLocaleString()}万円` : "—"}
+                    </td>
+                    <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 700, color: "#166534" }}>
+                      {totals.forecastMin > 0 ? `${totals.forecastMin.toLocaleString()}万円` : "—"}
+                    </td>
+                    <td style={{ padding: "11px 18px", fontSize: 13, fontWeight: 700, color: "#166534" }}>
+                      {totals.forecastMax > 0 ? `${totals.forecastMax.toLocaleString()}万円` : "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── CA cards grid ── */}
+          {staffList.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 60, color: "#9CAAB8" }}>
+              <p style={{ fontSize: 14 }}>CAメンバーが登録されていません</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+              {staffList.map((s, idx) => {
+                const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+                const st = stats[s.id] ?? { count: 0, avg: 0 };
+                return (
+                  <Link key={s.id} href={`/ca-management/${s.id}`} style={{ textDecoration: "none" }}>
+                    <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, cursor: "pointer", transition: "all 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#3B8FD4"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(59,143,212,0.15)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#C8DFF5"; e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)"; }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                        <div style={{ width: 44, height: 44, borderRadius: 12, background: color.bg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16, color: color.text, flexShrink: 0 }}>
+                          {initials(s.name)}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{s.name}</p>
+                          <p style={{ fontSize: 11, color: "#9CAAB8", marginTop: 1 }}>{s.experience} · {s.role}</p>
+                        </div>
+                        <ChevronRight size={16} color="#C8DFF5" />
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {[
+                          ["面談数", `${st.count}件`],
+                          ["平均スコア", st.avg > 0 ? `${st.avg}点` : "—"],
+                        ].map(([label, val]) => (
+                          <div key={label} style={{ background: "#F7FAFF", borderRadius: 8, padding: "8px 12px" }}>
+                            <p style={{ fontSize: 10, color: "#9CAAB8", marginBottom: 2 }}>{label}</p>
+                            <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{val}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {/* Add CA Modal */}
