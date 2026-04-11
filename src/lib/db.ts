@@ -388,7 +388,7 @@ export interface Candidate {
   updatedAt: string;
 }
 
-function mapDbCandidateToApp(row: Record<string, unknown>): Candidate {
+export function mapDbCandidateToApp(row: Record<string, unknown>): Candidate {
   return {
     id: row.id as string,
     caId: row.ca_id as string,

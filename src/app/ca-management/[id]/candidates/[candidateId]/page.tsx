@@ -1,13 +1,15 @@
 "use client";
 import { useState, useEffect, use, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, useParams } from "next/navigation";
 import {
-  fetchCandidateById, fetchCandidates, fetchStaffById, updateCandidate,
+  fetchStaffById, updateCandidate,
   fetchFeedbackSessionsByCandidateName, fetchFeedbackSessionsByCandidateId,
   fetchDocuments, fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
+  mapDbCandidateToApp,
   Candidate, TargetCompany, CandidateDocument, EntryRequest,
 } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { FeedbackSession, Staff } from "@/types";
 import {
   ChevronLeft, Edit2, Save, X, Plus, Trash2, Sparkles, ExternalLink,
@@ -879,26 +881,34 @@ const TABS = [
   { id: "entries",  label: "エントリー",  icon: ClipboardList },
 ];
 
-function CandidateDetailInner({ caId, candidateId }: { caId: string; candidateId: string }) {
+function CandidateDetailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const params = useParams();
+  const caId = params?.id as string;
+  const candidateId = params?.candidateId as string;
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [staff, setStaff] = useState<Staff | null>(null);
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") ?? "basic");
 
   useEffect(() => {
+    if (!candidateId) return;
     const load = async () => {
-      const [c, s] = await Promise.all([fetchCandidateById(candidateId), fetchStaffById(caId)]);
-      if (!c) {
-        // Fallback: fetchCandidateById returned null — try scanning the CA's full list
-        console.warn('fetchCandidateById returned null for id:', candidateId, '— falling back to fetchCandidates');
-        const all = await fetchCandidates(caId);
-        const found = all.find((cand) => cand.id === candidateId) ?? null;
-        setCandidate(found);
-      } else {
-        setCandidate(c);
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('*')
+        .eq('id', candidateId)
+        .single();
+      if (error) {
+        console.error('candidate fetch error:', error);
+        setNotFound(true);
+        setLoading(false);
+        return;
       }
+      setCandidate(mapDbCandidateToApp(data as Record<string, unknown>));
+      const s = await fetchStaffById(caId);
       setStaff(s);
       setLoading(false);
     };
@@ -909,7 +919,7 @@ function CandidateDetailInner({ caId, candidateId }: { caId: string; candidateId
   }, [candidateId, caId]);
 
   if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>;
-  if (!candidate) return (
+  if (notFound || !candidate) return (
     <div style={{ padding: 40, textAlign: "center" }}>
       <p style={{ color: "#991B1B" }}>求職者が見つかりません</p>
       <button onClick={() => router.back()} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#0D2B5E" }}>戻る</button>
@@ -988,11 +998,10 @@ function CandidateDetailInner({ caId, candidateId }: { caId: string; candidateId
   );
 }
 
-export default function CandidateDetailPage({ params }: { params: Promise<{ id: string; candidateId: string }> }) {
-  const { id: caId, candidateId } = use(params);
+export default function CandidateDetailPage() {
   return (
     <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>}>
-      <CandidateDetailInner caId={caId} candidateId={candidateId} />
+      <CandidateDetailInner />
     </Suspense>
   );
 }

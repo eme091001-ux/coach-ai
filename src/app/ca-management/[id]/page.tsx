@@ -26,6 +26,15 @@ const PHASE_OPTIONS = [
   { value: "G", label: "G 離脱" },
 ];
 
+const NA_OPTIONS = [
+  "次回二次面接（再一次）",
+  "次回求人提案",
+  "次回面接対策",
+  "次回企業面接",
+  "次回内定承諾",
+  "長期保有",
+];
+
 const READING_STYLE: Record<string, { bg: string; text: string }> = {
   A: { bg: "#FEE2E2", text: "#991B1B" },
   B: { bg: "#FEF9C3", text: "#854D0E" },
@@ -212,7 +221,7 @@ function CandidatesTab({ caId, candidates, loading, setCandidates, onAdd, onEdit
                     <select value={c.nextAction ?? ""} onChange={(e) => handleNextActionChange(c.id, e.target.value)}
                       style={{ fontSize: 11, border: "1px solid #C8DFF5", borderRadius: 6, padding: "3px 8px", color: "#0D2B5E", background: "#fff", cursor: "pointer" }}>
                       <option value="">NA未設定</option>
-                      {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                      {NA_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
                 </div>
@@ -1029,7 +1038,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
                 <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>ネクストアクション</label>
                 <select value={candidateForm.nextAction} onChange={(e) => setCandidateForm(prev => ({ ...prev, nextAction: e.target.value }))} style={inpStyle}>
                   <option value="">選択...</option>
-                  {PHASE_OPTIONS.map((p) => <option key={p.value} value={p.label}>{p.label}</option>)}
+                  {NA_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
             </div>
@@ -1077,7 +1086,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職業種</label>
                 <select value={candidateForm.currentIndustry} onChange={(e) => setCandidateForm(prev => ({ ...prev, currentIndustry: e.target.value }))} style={inpStyle}>
-                  <option value="">選択...</option>
+                  <option value="">選択してください（任意）</option>
                   {CURRENT_INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
