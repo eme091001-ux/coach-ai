@@ -3,12 +3,14 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  fetchStaffById, fetchCandidates, addCandidate, updateCandidate, deleteCandidate,
+  fetchStaffById, addCandidate, updateCandidate, deleteCandidate,
   fetchFeedbackSessionsFiltered, fetchDocuments, fetchEntryRequests, addEntryRequest,
   updateEntryStatus,
   fetchDailyReports, addDailyReport, fetchMonthlyForecast, upsertMonthlyForecast,
+  mapDbCandidateToApp,
   Candidate, CandidateDocument, EntryRequest, DailyReport,
 } from "@/lib/db";
+import { createClient } from "@/lib/supabase/client";
 import { Staff, FeedbackSession } from "@/types";
 import {
   ChevronLeft, Plus, Trash2, Edit2, User, X, Save, FileText, Briefcase,
@@ -884,7 +886,23 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
 
   useEffect(() => {
     fetchStaffById(id).then(setCA);
-    fetchCandidates(id).then((cs) => { setCandidates(cs); setCandidatesLoading(false); });
+    const supabase = createClient();
+    supabase
+      .from('candidates')
+      .select('*')
+      .eq('ca_id', id)
+      .order('reading', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('candidates fetch error:', error);
+          setCandidatesLoading(false);
+          return;
+        }
+        const mapped = (data ?? []).map((row) => mapDbCandidateToApp(row as Record<string, unknown>));
+        console.log('candidates loaded, ids:', mapped.map((c) => c.id));
+        setCandidates(mapped);
+        setCandidatesLoading(false);
+      });
   }, [id]);
 
   const openAdd = () => {
