@@ -96,6 +96,18 @@ const PHASE_BADGE: Record<string, { bg: string; text: string }> = {
   "内定後フォロー": { bg: "#FEE2E2", text: "#991B1B" },
 };
 
+// ── Step1 追加定数 ─────────────────────────────────────────────────────────────
+const MEDIA_OPTIONS = [
+  "リクナビNEXT", "マイナビ転職", "doda", "Green", "Wantedly",
+  "LinkedIn", "ビズリーチ", "ハローワーク", "エージェント（自社）", "その他",
+];
+
+const ENTRY_JOB_OPTIONS = [
+  "営業", "法人営業", "個人営業", "内勤営業", "施工管理", "販売", "接客",
+  "ITエンジニア", "電気・機械エンジニア", "インフラエンジニア", "マーケティング",
+  "企画", "人事・採用", "経理・財務", "コンサルタント", "マネージャー", "その他",
+];
+
 // ── Tab 1: Basic Info ─────────────────────────────────────────────────────────
 
 function BasicInfoTab({ candidate, onUpdate }: {
@@ -465,34 +477,64 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
   );
 }
 
-// ── Tab 4: Target Companies ───────────────────────────────────────────────────
+// ── Tab 4: Entry Companies (Step1: 媒体・売上・10社同時入力対応) ───────────────
+
+type EntryRow = { name: string; media: string; customMedia: string; jobType: string; minSales: string; maxSales: string };
+const EMPTY_ROW: EntryRow = { name: "", media: "", customMedia: "", jobType: "", minSales: "", maxSales: "" };
 
 function TargetCompaniesTab({ candidate, onUpdate }: {
   candidate: Candidate;
   onUpdate: (updated: Candidate) => void;
 }) {
   const [showModal, setShowModal] = useState(false);
-  const [newCompany, setNewCompany] = useState({ name: "", industry: "", jobType: "" });
+  const [rows, setRows] = useState<EntryRow[]>([{ ...EMPTY_ROW }]);
+  const [saving, setSaving] = useState(false);
   const [editingRec, setEditingRec] = useState<string | null>(null);
   const [recText, setRecText] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
   const companies = candidate.targetCompanies ?? [];
 
-  const handleAddCompany = async () => {
-    if (!newCompany.name.trim()) return;
-    const added: TargetCompany = {
-      id: crypto.randomUUID(),
-      name: newCompany.name,
-      industry: newCompany.industry || undefined,
-      jobType: newCompany.jobType || undefined,
-      status: "considering",
-      createdAt: new Date().toISOString(),
-    };
-    const updated = [...companies, added];
-    await updateCandidate(candidate.id, { targetCompanies: updated });
-    onUpdate({ ...candidate, targetCompanies: updated });
-    setNewCompany({ name: "", industry: "", jobType: "" });
-    setShowModal(false);
+  const openModal = () => {
+    setRows([{ ...EMPTY_ROW }]);
+    setShowModal(true);
+  };
+
+  const addRow = () => {
+    if (rows.length >= 10) return;
+    setRows([...rows, { ...EMPTY_ROW }]);
+  };
+
+  const removeRow = (i: number) => {
+    if (rows.length === 1) return;
+    setRows(rows.filter((_, idx) => idx !== i));
+  };
+
+  const updateRow = (i: number, field: keyof EntryRow, val: string) => {
+    setRows(rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  };
+
+  const handleAddCompanies = async () => {
+    const valid = rows.filter((r) => r.name.trim());
+    if (valid.length === 0) return;
+    setSaving(true);
+    try {
+      const added: TargetCompany[] = valid.map((r) => ({
+        id: crypto.randomUUID(),
+        name: r.name.trim(),
+        jobType: r.jobType || undefined,
+        media: r.customMedia.trim() || r.media || undefined,
+        minSales: r.minSales ? Number(r.minSales) : undefined,
+        maxSales: r.maxSales ? Number(r.maxSales) : undefined,
+        status: "considering" as const,
+        createdAt: new Date().toISOString(),
+      }));
+      const updated = [...companies, ...added];
+      await updateCandidate(candidate.id, { targetCompanies: updated });
+      onUpdate({ ...candidate, targetCompanies: updated });
+      setShowModal(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleStatusChange = async (companyId: string, status: TargetCompany["status"]) => {
@@ -545,73 +587,116 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
     onUpdate({ ...candidate, targetCompanies: updated });
   };
 
+  const inpSt: React.CSSProperties = { width: "100%", padding: "6px 8px", border: "1px solid #C8DFF5", borderRadius: 6, fontSize: 12, boxSizing: "border-box", color: "#0D2B5E", background: "#fff" };
+  const hasValid = rows.some((r) => r.name.trim());
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 13, color: "#9CAAB8" }}>受ける企業と推薦文</p>
-        <button onClick={() => setShowModal(true)}
+        <p style={{ fontSize: 13, color: "#9CAAB8" }}>エントリー企業と推薦文</p>
+        <button onClick={openModal}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}>
           <Plus size={13} /> 企業を追加
         </button>
       </div>
 
-      {/* Add company modal */}
+      {/* ── 一括追加モーダル（最大10社）── */}
       {showModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 400, maxWidth: "90vw" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>企業を追加</h3>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 28, width: 860, maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>エントリー企業を追加（最大10社）</h3>
               <button onClick={() => setShowModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9CAAB8" }}><X size={16} /></button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>企業名 *</label>
-                <input value={newCompany.name} onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })} placeholder="例: 株式会社〇〇"
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>業界</label>
-                <input value={newCompany.industry} onChange={(e) => setNewCompany({ ...newCompany, industry: e.target.value })} placeholder="例: IT・通信"
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>職種</label>
-                <input value={newCompany.jobType} onChange={(e) => setNewCompany({ ...newCompany, jobType: e.target.value })} placeholder="例: 法人営業"
-                  style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
-              </div>
+
+            {/* テーブルヘッダー */}
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 80px 80px 32px", gap: 6, marginBottom: 8, padding: "0 4px" }}>
+              {["企業名 *", "媒体", "職種", "MIN売上(万)", "MAX売上(万)", ""].map((h) => (
+                <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9CAAB8" }}>{h}</span>
+              ))}
             </div>
+
+            {/* 入力行 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {rows.map((r, i) => (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 80px 80px 32px", gap: 6, alignItems: "start" }}>
+                  {/* 企業名 */}
+                  <input value={r.name} onChange={(e) => updateRow(i, "name", e.target.value)}
+                    placeholder="株式会社〇〇" style={inpSt} />
+                  {/* 媒体 プルダウン + カスタム */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <select value={r.media} onChange={(e) => updateRow(i, "media", e.target.value)} style={inpSt}>
+                      <option value="">選択...</option>
+                      {MEDIA_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <input value={r.customMedia} onChange={(e) => updateRow(i, "customMedia", e.target.value)}
+                      placeholder="直接入力" style={{ ...inpSt, fontSize: 11 }} />
+                  </div>
+                  {/* 職種 */}
+                  <select value={r.jobType} onChange={(e) => updateRow(i, "jobType", e.target.value)} style={inpSt}>
+                    <option value="">選択...</option>
+                    {ENTRY_JOB_OPTIONS.map((j) => <option key={j} value={j}>{j}</option>)}
+                  </select>
+                  {/* MIN売上 */}
+                  <input type="number" value={r.minSales} onChange={(e) => updateRow(i, "minSales", e.target.value)}
+                    placeholder="0" min={0} style={inpSt} />
+                  {/* MAX売上 */}
+                  <input type="number" value={r.maxSales} onChange={(e) => updateRow(i, "maxSales", e.target.value)}
+                    placeholder="0" min={0} style={inpSt} />
+                  {/* 行削除 */}
+                  <button onClick={() => removeRow(i)} disabled={rows.length === 1}
+                    style={{ padding: "6px", borderRadius: 6, border: "1px solid #FCA5A5", background: "#FFF0F0", cursor: rows.length === 1 ? "not-allowed" : "pointer", color: "#991B1B", opacity: rows.length === 1 ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* 行追加ボタン */}
+            {rows.length < 10 && (
+              <button onClick={addRow}
+                style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#4A6FA5", background: "none", border: "1px dashed #C8DFF5", borderRadius: 8, padding: "6px 14px", cursor: "pointer", width: "100%", justifyContent: "center" }}>
+                <Plus size={12} /> 行を追加（{rows.length}/10）
+              </button>
+            )}
+
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 20 }}>
               <button onClick={() => setShowModal(false)}
                 style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 13, cursor: "pointer" }}>
                 キャンセル
               </button>
-              <button onClick={handleAddCompany} disabled={!newCompany.name.trim()}
-                style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: !newCompany.name.trim() ? "not-allowed" : "pointer", opacity: !newCompany.name.trim() ? 0.6 : 1 }}>
-                追加
+              <button onClick={handleAddCompanies} disabled={!hasValid || saving}
+                style={{ padding: "8px 24px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: (!hasValid || saving) ? "not-allowed" : "pointer", opacity: (!hasValid || saving) ? 0.6 : 1 }}>
+                {saving ? "保存中..." : `${rows.filter((r) => r.name.trim()).length}社を追加`}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ── 企業カード一覧 ── */}
       {companies.length === 0 ? (
         <div style={{ textAlign: "center", padding: 60, background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12 }}>
-          <p style={{ fontSize: 14, color: "#9CAAB8" }}>受ける企業が登録されていません</p>
+          <p style={{ fontSize: 14, color: "#9CAAB8" }}>エントリー企業が登録されていません</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {companies.map((c) => {
-            const statusLabel = TARGET_STATUS_LABELS[c.status] ?? c.status;
             const isEditingThisRec = editingRec === c.id;
             return (
               <div key={c.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 16 }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
                   <Building2 size={16} color="#3B8FD4" style={{ marginTop: 2, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 2 }}>{c.name}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 4 }}>{c.name}</p>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {c.industry && <span style={{ fontSize: 11, color: "#9CAAB8" }}>{c.industry}</span>}
-                      {c.jobType && <span style={{ fontSize: 11, color: "#9CAAB8" }}>{c.jobType}</span>}
+                      {c.jobType && <span style={{ fontSize: 11, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#4A6FA5" }}>{c.jobType}</span>}
+                      {c.media && <span style={{ fontSize: 11, background: "#EBF5FF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#1A5BA6" }}>{c.media}</span>}
+                      {(c.minSales || c.maxSales) && (
+                        <span style={{ fontSize: 11, background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 6, padding: "1px 7px", color: "#166534", fontWeight: 600 }}>
+                          {c.minSales ?? "—"}〜{c.maxSales ?? "—"}万円
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -627,7 +712,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
                     </button>
                   </div>
                 </div>
-                {/* Recommendation */}
+                {/* 推薦文（既存機能そのまま） */}
                 <div style={{ background: "#F7FAFF", borderRadius: 8, padding: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5" }}>推薦文</p>
@@ -826,7 +911,7 @@ const TABS = [
   { id: "basic",    label: "👤 基本情報" },
   { id: "feedback", label: "🗂 面談履歴" },
   { id: "docs",     label: "📄 書類" },
-  { id: "companies",label: "🏢 受ける企業" },
+  { id: "companies",label: "🏢 エントリー企業" },
   { id: "entries",  label: "📋 エントリー依頼" },
 ];
 

@@ -358,6 +358,10 @@ export interface TargetCompany {
   jobType?: string;
   minIncome?: number;
   maxIncome?: number;
+  // ── Step1 追加フィールド ──
+  media?: string;     // 媒体
+  minSales?: number;  // ミニマム売上（CA売上）
+  maxSales?: number;  // マックス売上（CA売上）
   status: 'considering' | 'entered' | 'interviewing' | 'offered' | 'declined' | 'rejected';
   recommendation?: string;
   createdAt: string;
