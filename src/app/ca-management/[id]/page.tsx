@@ -892,14 +892,17 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
       .from('candidates')
       .select('*')
       .eq('ca_id', id)
-      .order('reading', { ascending: true });
+      .order('created_at', { ascending: false });
     if (error) {
       console.error('candidates fetch error:', error);
       setCandidatesLoading(false);
       return;
     }
-    const mapped = (data ?? []).map((row) => mapDbCandidateToApp(row as Record<string, unknown>));
-    setCandidates(mapped);
+    if (data) {
+      // mapDbCandidateToApp はフィールド名を snake_case→camelCase に変換するだけで
+      // id は row.id をそのまま使用するため Supabase 側のIDが保持される
+      setCandidates(data.map((row) => mapDbCandidateToApp(row as Record<string, unknown>)));
+    }
     setCandidatesLoading(false);
   }, [id]);
 
@@ -975,9 +978,9 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
           return next.sort((a, b) => a.reading.localeCompare(b.reading));
         });
       } else {
-        const created = await addCandidate(payload);
-        const newC = created ?? { id: crypto.randomUUID(), ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-        setCandidates((prev) => [...prev, newC].sort((a, b) => a.reading.localeCompare(b.reading)));
+        await addCandidate(payload);
+        // Supabase が採番したIDを確実に使うため、ローカルUUID生成を使わず再フェッチする
+        await fetchCandidates();
       }
     } finally {
       setSaving(false);
