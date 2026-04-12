@@ -770,6 +770,10 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({ companyName: "", media: "", jobType: "", recommendation: "" });
 
+  // ── Step3: 一括選択状態 ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   useEffect(() => {
     fetchEntryRequestsByCandidateId(candidate.id).then((es) => {
       setEntries(es);
@@ -777,6 +781,70 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
     });
   }, [candidate.id]);
 
+  // ── Step3: 一括エントリー依頼 ──
+  const targetCompanies = candidate.targetCompanies ?? [];
+  // すでに依頼済みの企業名セット（バッジ表示用）
+  const submittedNames = new Set(entries.map((e) => e.companyName));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === targetCompanies.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(targetCompanies.map((c) => c.id)));
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    const selected = targetCompanies.filter((c) => selectedIds.has(c.id));
+    if (selected.length === 0) return;
+    setBulkSubmitting(true);
+    try {
+      const created: EntryRequest[] = [];
+      for (const company of selected) {
+        const id = await addEntryRequest({
+          caId,
+          candidateId: candidate.id,
+          candidateName: candidate.name,
+          companyName: company.name,
+          media: company.media ? [company.media] : [],
+          jobType: company.jobType,
+          minSales: company.minSales,
+          maxSales: company.maxSales,
+          status: "pending",
+        });
+        if (id) {
+          created.push({
+            id,
+            caId,
+            candidateId: candidate.id,
+            candidateName: candidate.name,
+            companyName: company.name,
+            media: company.media ? [company.media] : [],
+            jobType: company.jobType,
+            minSales: company.minSales,
+            maxSales: company.maxSales,
+            status: "pending",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+      setEntries((prev) => [...created, ...prev]);
+      setSelectedIds(new Set());
+    } finally {
+      setBulkSubmitting(false);
+    }
+  };
+
+  // 既存の手動追加フォーム
   const handleSubmit = async () => {
     if (!form.companyName.trim()) return;
     setSubmitting(true);
@@ -816,16 +884,65 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
     await updateEntryStatus(id, status);
   };
 
-  // Auto-fill companies from target companies
-  const targetCompanyNames = (candidate.targetCompanies ?? []).map((c) => c.name);
+  const targetCompanyNames = targetCompanies.map((c) => c.name);
 
   return (
     <div>
+      {/* ── Step3: エントリー企業から一括依頼 ── */}
+      {targetCompanies.length > 0 && (
+        <div style={{ background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "#0D2B5E" }}>エントリー企業から一括依頼</p>
+            <button onClick={toggleSelectAll}
+              style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", cursor: "pointer" }}>
+              {selectedIds.size === targetCompanies.length ? "全解除" : "全選択"}
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+            {targetCompanies.map((c) => {
+              const checked = selectedIds.has(c.id);
+              const alreadySubmitted = submittedNames.has(c.name);
+              return (
+                <label key={c.id}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: checked ? "#EBF5FF" : "#fff", border: `1px solid ${checked ? "#1A5BA6" : "#C8DFF5"}`, borderRadius: 8, cursor: "pointer", userSelect: "none" }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleSelect(c.id)} style={{ width: 15, height: 15, accentColor: "#1A5BA6", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E" }}>{c.name}</span>
+                      {alreadySubmitted && (
+                        <span style={{ fontSize: 10, background: "#DCFCE7", color: "#166534", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>依頼済</span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                      {c.jobType && <span style={{ fontSize: 11, color: "#4A6FA5" }}>{c.jobType}</span>}
+                      {c.media && <span style={{ fontSize: 11, background: "#EBF5FF", borderRadius: 4, padding: "0 5px", color: "#1A5BA6" }}>{c.media}</span>}
+                      {(c.minSales || c.maxSales) && (
+                        <span style={{ fontSize: 11, color: "#166534", fontWeight: 600 }}>{c.minSales ?? "—"}〜{c.maxSales ?? "—"}万円</span>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button onClick={handleBulkSubmit} disabled={selectedIds.size === 0 || bulkSubmitting}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 20px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: (selectedIds.size === 0 || bulkSubmitting) ? "not-allowed" : "pointer", opacity: (selectedIds.size === 0 || bulkSubmitting) ? 0.5 : 1 }}>
+              <ClipboardList size={14} />
+              {bulkSubmitting ? "送信中..." : `${selectedIds.size}社にエントリー依頼を送る`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 手動追加フォーム（既存機能そのまま） ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <p style={{ fontSize: 13, color: "#9CAAB8" }}>エントリー依頼一覧</p>
         <button onClick={() => setShowForm(!showForm)}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", border: "none", cursor: "pointer" }}>
-          <Plus size={13} /> エントリー依頼を追加
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>
+          <Plus size={13} /> 手動で追加
         </button>
       </div>
 
