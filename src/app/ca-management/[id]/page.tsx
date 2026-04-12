@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   fetchStaffById, addCandidate, updateCandidate, deleteCandidate,
   fetchFeedbackSessionsFiltered, fetchDocuments, fetchEntryRequests, addEntryRequest,
@@ -871,6 +871,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 
 export default function CADetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const pathname = usePathname();
   const [ca, setCA] = useState<Staff | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("candidates");
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -884,26 +885,33 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   });
   const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
 
-  useEffect(() => {
-    fetchStaffById(id).then(setCA);
+  const fetchCandidates = useCallback(async () => {
+    setCandidatesLoading(true);
     const supabase = createClient();
-    supabase
+    const { data, error } = await supabase
       .from('candidates')
       .select('*')
       .eq('ca_id', id)
-      .order('reading', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('candidates fetch error:', error);
-          setCandidatesLoading(false);
-          return;
-        }
-        const mapped = (data ?? []).map((row) => mapDbCandidateToApp(row as Record<string, unknown>));
-        console.log('candidates loaded, ids:', mapped.map((c) => c.id));
-        setCandidates(mapped);
-        setCandidatesLoading(false);
-      });
+      .order('reading', { ascending: true });
+    if (error) {
+      console.error('candidates fetch error:', error);
+      setCandidatesLoading(false);
+      return;
+    }
+    const mapped = (data ?? []).map((row) => mapDbCandidateToApp(row as Record<string, unknown>));
+    setCandidates(mapped);
+    setCandidatesLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    fetchStaffById(id).then(setCA);
+  }, [id]);
+
+  useEffect(() => {
+    if (pathname === `/ca-management/${id}`) {
+      fetchCandidates();
+    }
+  }, [pathname, id, fetchCandidates]);
 
   const openAdd = () => {
     setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });

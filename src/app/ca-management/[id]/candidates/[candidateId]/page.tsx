@@ -842,25 +842,44 @@ export default function CandidateDetailPage() {
 
   useEffect(() => {
     if (!candidateId) {
-      setError("candidateId is undefined");
+      setError("IDが取得できませんでした");
       setLoading(false);
       return;
     }
+
     const supabase = createClient();
-    supabase
-      .from("candidates")
-      .select("*")
-      .eq("id", candidateId)
-      .maybeSingle()
-      .then(({ data, error }) => {
+
+    const fetchCandidate = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("candidates")
+          .select("*")
+          .eq("id", candidateId)
+          .maybeSingle();
+
         if (error) {
-          console.error("Supabase error:", error);
+          console.error("fetch error:", error);
           setError(error.message);
-        } else {
-          setCandidate(mapDbCandidateToApp(data as Record<string, unknown>));
+          setLoading(false);
+          return;
         }
+
+        if (!data) {
+          setError("求職者が見つかりません");
+          setLoading(false);
+          return;
+        }
+
+        setCandidate(mapDbCandidateToApp(data as Record<string, unknown>));
         setLoading(false);
-      });
+      } catch (e) {
+        console.error("unexpected error:", e);
+        setError("予期しないエラーが発生しました");
+        setLoading(false);
+      }
+    };
+
+    fetchCandidate();
   }, [candidateId]);
 
   if (loading) return (
