@@ -549,6 +549,10 @@ export interface EntryRequest {
   recommendation?: string;
   interviewDates?: string[];
   status: 'pending' | 'entered' | 'adjusting' | 'confirmed' | 'done' | 'stopped';
+  // ── Step2 追加フィールド ──
+  jobType?: string;   // 職種
+  minSales?: number;  // ミニマム売上（CA売上）
+  maxSales?: number;  // マックス売上（CA売上）
   createdAt: string;
   updatedAt: string;
 }
@@ -568,6 +572,10 @@ function mapDbEntryToApp(row: Record<string, unknown>): EntryRequest {
     recommendation: row.recommendation as string | undefined,
     interviewDates: row.interview_dates as string[] | undefined,
     status: (row.status as EntryRequest['status']) ?? 'pending',
+    // Step2 追加フィールド
+    jobType: row.job_type as string | undefined,
+    minSales: row.min_sales as number | undefined,
+    maxSales: row.max_sales as number | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -604,6 +612,10 @@ export async function addEntryRequest(
       recommendation: entry.recommendation ?? null,
       interview_dates: entry.interviewDates ?? [],
       status: entry.status ?? 'pending',
+      // Step2 追加フィールド
+      job_type: entry.jobType ?? null,
+      min_sales: entry.minSales ?? null,
+      max_sales: entry.maxSales ?? null,
     })
     .select('id')
     .single();

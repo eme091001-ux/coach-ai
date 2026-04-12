@@ -768,7 +768,7 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ companyName: "", media: "", recommendation: "" });
+  const [form, setForm] = useState({ companyName: "", media: "", jobType: "", recommendation: "" });
 
   useEffect(() => {
     fetchEntryRequestsByCandidateId(candidate.id).then((es) => {
@@ -786,6 +786,7 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
       candidateName: candidate.name,
       companyName: form.companyName,
       media: form.media ? [form.media] : [],
+      jobType: form.jobType || undefined,
       recommendation: form.recommendation || undefined,
       status: "pending",
     });
@@ -797,6 +798,7 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
         candidateName: candidate.name,
         companyName: form.companyName,
         media: form.media ? [form.media] : [],
+        jobType: form.jobType || undefined,
         recommendation: form.recommendation || undefined,
         status: "pending",
         createdAt: new Date().toISOString(),
@@ -804,7 +806,7 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
       };
       setEntries((prev) => [newEntry, ...prev]);
     }
-    setForm({ companyName: "", media: "", recommendation: "" });
+    setForm({ companyName: "", media: "", jobType: "", recommendation: "" });
     setShowForm(false);
     setSubmitting(false);
   };
@@ -840,8 +842,19 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
             </div>
             <div>
               <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>媒体</label>
-              <input value={form.media} onChange={(e) => setForm({ ...form, media: e.target.value })} placeholder="例: リクルートエージェント"
-                style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
+              <select value={form.media} onChange={(e) => setForm({ ...form, media: e.target.value })}
+                style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box", background: "#fff", color: "#0D2B5E" }}>
+                <option value="">選択...</option>
+                {MEDIA_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>職種</label>
+              <select value={form.jobType} onChange={(e) => setForm({ ...form, jobType: e.target.value })}
+                style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box", background: "#fff", color: "#0D2B5E" }}>
+                <option value="">選択...</option>
+                {ENTRY_JOB_OPTIONS.map((j) => <option key={j} value={j}>{j}</option>)}
+              </select>
             </div>
             <div style={{ gridColumn: "1/-1" }}>
               <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>推薦文</label>
@@ -877,9 +890,10 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 2 }}>{e.companyName}</p>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {e.jobType && <span style={{ fontSize: 11, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#4A6FA5" }}>{e.jobType}</span>}
                       {(e.media ?? []).map((m) => (
-                        <span key={m} style={{ fontSize: 11, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 6px", color: "#4A6FA5" }}>{m}</span>
+                        <span key={m} style={{ fontSize: 11, background: "#EBF5FF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 6px", color: "#1A5BA6" }}>{m}</span>
                       ))}
                       <span style={{ fontSize: 11, color: "#9CAAB8" }}>{new Date(e.createdAt).toLocaleDateString("ja-JP")}</span>
                     </div>

@@ -115,8 +115,8 @@ function DetailModal({ entry, onClose, onUpdate }: {
           {[
             ["求職者名", entry.candidateName],
             ["応募企業", entry.companyName],
-            ["企業ID", entry.companyId ?? "—"],
             ["担当CA", entry.caName ?? "—"],
+            ["職種", entry.jobType ?? "—"],
           ].map(([label, val]) => (
             <div key={label as string}>
               <p style={{ fontSize: 10, color: "#9CAAB8", marginBottom: 3 }}>{label}</p>
@@ -124,6 +124,15 @@ function DetailModal({ entry, onClose, onUpdate }: {
             </div>
           ))}
         </div>
+
+        {(entry.minSales != null || entry.maxSales != null) && (
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontSize: 10, color: "#9CAAB8", marginBottom: 6 }}>CA売上見込み</p>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#166534", background: "#DCFCE7", borderRadius: 8, padding: "3px 12px" }}>
+              {entry.minSales ?? "—"} 〜 {entry.maxSales ?? "—"} 万円
+            </span>
+          </div>
+        )}
 
         {entry.media && entry.media.length > 0 && (
           <div style={{ marginBottom: 16 }}>
@@ -460,7 +469,7 @@ function EntryListTab({
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#F7FAFF", borderBottom: "1px solid #C8DFF5" }}>
-                {["候補者名", "応募企業", "担当CA", "媒体", "ステータス", "経過", "依頼日"].map((h) => (
+                {["候補者名", "応募企業", "担当CA", "職種", "媒体", "ステータス", "経過", "依頼日"].map((h) => (
                   <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#4A6FA5", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -477,6 +486,11 @@ function EntryListTab({
                     </td>
                     <td style={{ padding: "10px 16px", fontSize: 13, color: "#4A6FA5" }}>{entry.companyName}</td>
                     <td style={{ padding: "10px 16px", fontSize: 12, color: "#4A6FA5" }}>{entry.caName ?? "—"}</td>
+                    <td style={{ padding: "10px 16px", fontSize: 12, color: "#0D2B5E" }}>
+                      {entry.jobType
+                        ? <span style={{ background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", fontSize: 11 }}>{entry.jobType}</span>
+                        : <span style={{ color: "#C8DFF5" }}>—</span>}
+                    </td>
                     <td style={{ padding: "10px 16px" }}>
                       {entry.media && entry.media.length > 0 ? (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
