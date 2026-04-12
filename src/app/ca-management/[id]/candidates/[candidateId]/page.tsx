@@ -851,7 +851,7 @@ export default function CandidateDetailPage() {
       .from("candidates")
       .select("*")
       .eq("id", candidateId)
-      .single()
+      .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
           console.error("Supabase error:", error);
