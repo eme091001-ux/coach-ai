@@ -880,7 +880,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   const [editing, setEditing] = useState<Candidate | null>(null);
   const [saving, setSaving] = useState(false);
   const [candidateForm, setCandidateForm] = useState({
-    name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '',
+    name: '', phase: 'F 長期保有', nextAction: '', currentJobType: '', memo: '',
     age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] as string[],
   });
   const inpStyle: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #C8DFF5', borderRadius: 6, fontSize: 13, color: '#0D2B5E', outline: 'none', boxSizing: 'border-box', background: '#fff' };
@@ -917,7 +917,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   }, [pathname, id, fetchCandidates]);
 
   const openAdd = () => {
-    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJobType: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
     setEditing(null);
     setShowModal(true);
   };
@@ -927,8 +927,7 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
       name: c.name,
       phase: c.phase,
       nextAction: c.nextAction ?? '',
-      currentIndustry: c.currentCompany ?? '',
-      desiredJob: c.desiredJob ?? '',
+      currentJobType: c.currentCompany ?? '',
       memo: c.memo ?? '',
       age: c.age !== undefined ? String(c.age) : '',
       prefecture: c.prefecture ?? '',
@@ -945,46 +944,61 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
   const closeModal = () => {
     setShowModal(false);
     setEditing(null);
-    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentIndustry: '', desiredJob: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
+    setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJobType: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
   };
 
   const handleModalSave = async () => {
     if (!candidateForm.name.trim()) return;
     setSaving(true);
+
     try {
-      const reading = (candidateForm.phase.charAt(0) as Candidate['reading']) || 'F';
-      const payload: Omit<Candidate, 'id' | 'createdAt' | 'updatedAt'> = {
-        caId: id, caName: ca?.name ?? '',
-        name: candidateForm.name,
-        reading,
-        phase: candidateForm.phase,
-        nextAction: candidateForm.nextAction || undefined,
-        currentCompany: candidateForm.currentIndustry || undefined,
-        desiredJob: candidateForm.desiredJob || undefined,
-        memo: candidateForm.memo || undefined,
-        targetCompanies: editing?.targetCompanies ?? [],
-        age: candidateForm.age ? Number(candidateForm.age) : undefined,
-        prefecture: candidateForm.prefecture || undefined,
-        gender: candidateForm.gender || undefined,
-        education: candidateForm.education || undefined,
-        currentIncome: candidateForm.currentIncome !== '' ? Number(candidateForm.currentIncome) : undefined,
-        desiredIncome: candidateForm.desiredIncome !== '' ? Number(candidateForm.desiredIncome) : undefined,
-        desiredJobs: candidateForm.desiredJobs.length > 0 ? candidateForm.desiredJobs : undefined,
+      const supabase = createClient();
+
+      const payload = {
+        ca_id: id,
+        ca_name: ca?.name ?? '',
+        name: candidateForm.name.trim(),
+        reading: candidateForm.phase?.charAt(0) || 'F',
+        phase: candidateForm.phase || 'F 長期保有',
+        next_action: candidateForm.nextAction || null,
+        current_job_type: candidateForm.currentJobType || null,
+        memo: candidateForm.memo || null,
+        age: candidateForm.age ? parseInt(candidateForm.age) : null,
+        prefecture: candidateForm.prefecture || null,
+        gender: candidateForm.gender || null,
+        education: candidateForm.education || null,
+        current_income: candidateForm.currentIncome ? parseInt(candidateForm.currentIncome) : null,
+        desired_income: candidateForm.desiredIncome ? parseInt(candidateForm.desiredIncome) : null,
+        desired_jobs: candidateForm.desiredJobs?.length > 0 ? candidateForm.desiredJobs : null,
       };
-      if (editing) {
-        await updateCandidate(editing.id, payload);
-        setCandidates((prev) => {
-          const next = prev.map((c) => c.id === editing.id ? { ...editing, ...payload } : c);
-          return next.sort((a, b) => a.reading.localeCompare(b.reading));
-        });
-      } else {
-        await addCandidate(payload);
-        // Supabase が採番したIDを確実に使うため、ローカルUUID生成を使わず再フェッチする
-        await fetchCandidates();
+
+      console.log('saving payload:', payload);
+
+      const { data, error } = await supabase
+        .from('candidates')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('insert error:', error);
+        alert('保存に失敗しました: ' + error.message);
+        setSaving(false);
+        return;
       }
+
+      console.log('saved:', data);
+      setShowModal(false);
+      setCandidateForm({ name: '', phase: 'F 長期保有', nextAction: '', currentJobType: '', memo: '', age: '', prefecture: '', gender: '', education: '', currentIncome: '', desiredIncome: '', desiredJobs: [] });
+
+      // Supabaseから再取得
+      await fetchCandidates();
+
+    } catch (e) {
+      console.error('unexpected error:', e);
+      alert('予期しないエラーが発生しました');
     } finally {
       setSaving(false);
-      closeModal();
     }
   };
 
@@ -1110,25 +1124,13 @@ export default function CADetailPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
 
-            {/* 現職業種 / 現職種 */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職業種</label>
-                <select value={candidateForm.currentIndustry} onChange={(e) => setCandidateForm(prev => ({ ...prev, currentIndustry: e.target.value }))} style={inpStyle}>
-                  <option value="">選択してください（任意）</option>
-                  {CURRENT_INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職種</label>
-                <input
-                  type="text"
-                  value={candidateForm.desiredJob}
-                  onChange={(e) => setCandidateForm(prev => ({ ...prev, desiredJob: e.target.value }))}
-                  placeholder="法人営業"
-                  style={inpStyle}
-                />
-              </div>
+            {/* 現職業種 */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#4A6FA5', display: 'block', marginBottom: 4 }}>現職業種</label>
+              <select value={candidateForm.currentJobType} onChange={(e) => setCandidateForm(prev => ({ ...prev, currentJobType: e.target.value }))} style={inpStyle}>
+                <option value="">選択してください（任意）</option>
+                {CURRENT_INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
             </div>
 
             {/* 現年収 / 希望年収 */}
