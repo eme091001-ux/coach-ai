@@ -623,6 +623,19 @@ export async function addEntryRequest(
   return data.id as string;
 }
 
+// Step4: 推薦文をエントリー依頼単位で保存
+export async function updateEntryRecommendation(
+  id: string,
+  recommendation: string
+): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  const { error } = await supabase
+    .from('entry_requests')
+    .update({ recommendation, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  return !error;
+}
+
 export async function updateEntryStatus(
   id: string,
   status: EntryRequest['status']

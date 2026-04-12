@@ -7,6 +7,7 @@ import {
   mapDbCandidateToApp, updateCandidate,
   fetchFeedbackSessionsByCandidateId,
   fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
+  updateEntryRecommendation,
   fetchDocuments,
   Candidate, CandidateDocument, EntryRequest, TargetCompany,
 } from "@/lib/db";
@@ -774,6 +775,12 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
+  // ── Step4: 推薦文編集状態（エントリーID単位） ──
+  const [recEditing, setRecEditing] = useState<string | null>(null);
+  const [recText, setRecText] = useState("");
+  const [recGenerating, setRecGenerating] = useState<string | null>(null);
+  const [recSaving, setRecSaving] = useState<string | null>(null);
+
   useEffect(() => {
     fetchEntryRequestsByCandidateId(candidate.id).then((es) => {
       setEntries(es);
@@ -882,6 +889,55 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
   const handleStatusChange = async (id: string, status: EntryRequest["status"]) => {
     setEntries((prev) => prev.map((e) => e.id === id ? { ...e, status } : e));
     await updateEntryStatus(id, status);
+  };
+
+  // ── Step4: 推薦文ハンドラー ──
+  const handleGenerateRec = async (entry: EntryRequest) => {
+    setRecGenerating(entry.id);
+    try {
+      const res = await fetch("/api/recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateName: candidate.name,
+          companyName: entry.companyName,
+          jobType: entry.jobType,
+          age: candidate.age,
+          education: candidate.education,
+          currentIncome: candidate.currentIncome,
+          desiredIncome: candidate.desiredIncome,
+          desiredJobs: candidate.desiredJobs,
+          memo: candidate.memo,
+        }),
+      });
+      if (res.ok) {
+        const { text } = await res.json();
+        // 生成後は編集モードへ（自動保存しない）
+        setRecText(text);
+        setRecEditing(entry.id);
+      } else {
+        alert("推薦文の生成に失敗しました");
+      }
+    } catch {
+      alert("推薦文の生成に失敗しました");
+    } finally {
+      setRecGenerating(null);
+    }
+  };
+
+  const handleSaveRec = async (entryId: string) => {
+    setRecSaving(entryId);
+    try {
+      const ok = await updateEntryRecommendation(entryId, recText);
+      if (ok) {
+        setEntries((prev) => prev.map((e) => e.id === entryId ? { ...e, recommendation: recText } : e));
+        setRecEditing(null);
+      } else {
+        alert("保存に失敗しました");
+      }
+    } finally {
+      setRecSaving(null);
+    }
   };
 
   const targetCompanyNames = targetCompanies.map((c) => c.name);
@@ -1022,11 +1078,59 @@ function EntryRequestsTab({ candidate, caId }: { candidate: Candidate; caId: str
                     ))}
                   </select>
                 </div>
-                {e.recommendation && (
-                  <p style={{ marginTop: 8, fontSize: 12, color: "#4A6FA5", background: "#F7FAFF", borderRadius: 6, padding: "8px 10px", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                    {e.recommendation}
-                  </p>
-                )}
+                {/* ── Step4: 推薦文エリア ── */}
+                <div style={{ marginTop: 10, background: "#F7FAFF", borderRadius: 8, padding: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#4A6FA5" }}>推薦文</span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {recEditing !== e.id && (
+                        <>
+                          {e.recommendation && (
+                            <button
+                              onClick={() => { setRecText(e.recommendation ?? ""); setRecEditing(e.id); }}
+                              style={{ fontSize: 10, padding: "3px 8px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", cursor: "pointer" }}>
+                              編集
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleGenerateRec(e)}
+                            disabled={recGenerating === e.id}
+                            style={{ fontSize: 10, padding: "3px 8px", borderRadius: 6, border: "none", background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", cursor: recGenerating === e.id ? "wait" : "pointer", opacity: recGenerating === e.id ? 0.7 : 1 }}>
+                            {recGenerating === e.id ? "生成中..." : e.recommendation ? "再生成" : "AI生成"}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {recEditing === e.id ? (
+                    <div>
+                      <textarea
+                        value={recText}
+                        onChange={(ev) => setRecText(ev.target.value)}
+                        rows={4}
+                        style={{ width: "100%", padding: "8px 10px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 12, resize: "vertical", boxSizing: "border-box", marginBottom: 8 }}
+                      />
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        <button
+                          onClick={() => setRecEditing(null)}
+                          style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", cursor: "pointer" }}>
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => handleSaveRec(e.id)}
+                          disabled={recSaving === e.id || !recText.trim()}
+                          style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "none", background: "#1A5BA6", color: "#fff", cursor: (recSaving === e.id || !recText.trim()) ? "not-allowed" : "pointer", opacity: (recSaving === e.id || !recText.trim()) ? 0.6 : 1 }}>
+                          {recSaving === e.id ? "保存中..." : "保存"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 12, color: e.recommendation ? "#0D2B5E" : "#9CAAB8", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                      {e.recommendation || "推薦文が未作成です。「AI生成」で作成してください。"}
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })}
