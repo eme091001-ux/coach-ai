@@ -144,6 +144,7 @@ function BasicInfoTab({ candidate, onUpdate }: {
   };
 
   const handleSave = async () => {
+    console.log('saving trust_rank:', form.trustRank);
     setSaving(true);
     const updates: Partial<Candidate> = {
       name: form.name,
@@ -354,7 +355,7 @@ function BasicInfoTab({ candidate, onUpdate }: {
           <span style={{ fontSize: 18, fontWeight: 800, color: "#0D2B5E" }}>{candidate.name}</span>
           <span style={{ fontSize: 11, background: "#E8F2FC", color: "#1A5BA6", borderRadius: 8, padding: "2px 8px" }}>{candidate.phase}</span>
         </div>
-        <button onClick={() => setEditing(true)}
+        <button onClick={() => { console.log('editing candidate:', candidate); setEditing(true); }}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, cursor: "pointer" }}>
           <Edit2 size={12} /> 編集
         </button>

@@ -549,6 +549,7 @@ export async function updateCandidate(
   if (updates.nextAction !== undefined) patch.next_action = updates.nextAction;
   if (updates.memo !== undefined) patch.memo = updates.memo;
   if (updates.trustRank !== undefined) patch.trust_rank = updates.trustRank || null;
+  console.log('patch:', patch);
   const { error } = await supabase.from('candidates').update(patch).eq('id', id);
   if (error) console.error('updateCandidate error:', error);
   return !error;
