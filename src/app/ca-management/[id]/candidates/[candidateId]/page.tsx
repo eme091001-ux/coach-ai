@@ -26,6 +26,14 @@ const READING_STYLE: Record<string, { bg: string; text: string }> = {
   G: { bg: "#F1F0E8", text: "#5F5E5A" },
 };
 
+const TRUST_RANK_COLOR: Record<string, string> = {
+  A: "#22c55e",
+  B: "#3b82f6",
+  C: "#eab308",
+  D: "#f97316",
+  E: "#ef4444",
+};
+
 const PHASE_OPTIONS = [
   { value: "A", label: "A 内定承諾" },
   { value: "B", label: "B 内定" },
@@ -99,8 +107,7 @@ const PHASE_BADGE: Record<string, { bg: string; text: string }> = {
 
 // ── Step1 追加定数 ─────────────────────────────────────────────────────────────
 const MEDIA_OPTIONS = [
-  "リクナビNEXT", "マイナビ転職", "doda", "Green", "Wantedly",
-  "LinkedIn", "ビズリーチ", "ハローワーク", "エージェント（自社）", "その他",
+  "サーカス", "Zcareer", "エクソード", "直求人", "ゼロタレ",
 ];
 
 const ENTRY_JOB_OPTIONS = [
@@ -590,6 +597,10 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
   const inpSt: React.CSSProperties = { width: "100%", padding: "6px 8px", border: "1px solid #C8DFF5", borderRadius: 6, fontSize: 12, boxSizing: "border-box", color: "#0D2B5E", background: "#fff" };
   const hasValid = rows.some((r) => r.name.trim());
 
+  const prices = companies.map((c) => c.unitPrice).filter((p): p is number => p !== undefined);
+  const minUnitPrice = prices.length > 0 ? Math.min(...prices) : null;
+  const maxUnitPrice = prices.length > 0 ? Math.max(...prices) : null;
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -599,6 +610,20 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
           <Plus size={13} /> 企業を追加
         </button>
       </div>
+
+      {/* ── 単価サマリー ── */}
+      {minUnitPrice !== null && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "12px 16px" }}>
+            <p style={{ fontSize: 10, color: "#166534", marginBottom: 4 }}>ミニマム単価</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "#15803D" }}>{minUnitPrice.toLocaleString()}万円</p>
+          </div>
+          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px" }}>
+            <p style={{ fontSize: 10, color: "#1D4ED8", marginBottom: 4 }}>マックス単価</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "#1D4ED8" }}>{maxUnitPrice!.toLocaleString()}万円</p>
+          </div>
+        </div>
+      )}
 
       {/* ── 一括追加モーダル（最大10社）── */}
       {showModal && (
@@ -689,9 +714,9 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {c.jobType && <span style={{ fontSize: 11, background: "#F7FAFF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#4A6FA5" }}>{c.jobType}</span>}
                       {c.media && <span style={{ fontSize: 11, background: "#EBF5FF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#1A5BA6" }}>{c.media}</span>}
-                      {(c.minSales || c.maxSales) && (
+                      {c.unitPrice !== undefined && (
                         <span style={{ fontSize: 11, background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 6, padding: "1px 7px", color: "#166534", fontWeight: 600 }}>
-                          {c.minSales ?? "—"}〜{c.maxSales ?? "—"}万円
+                          単価：{c.unitPrice}万円
                         </span>
                       )}
                     </div>
@@ -1235,6 +1260,11 @@ export default function CandidateDetailPage() {
           <ChevronLeft size={14} /> 戻る
         </Link>
         <span style={{ fontSize: 10, color: "#C8DFF5" }}>|</span>
+        {candidate.trustRank && (
+          <div style={{ width: 36, height: 36, borderRadius: "50%", background: TRUST_RANK_COLOR[candidate.trustRank] ?? "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, flexShrink: 0 }}>
+            {candidate.trustRank}
+          </div>
+        )}
         <span style={{ fontSize: 16, fontWeight: 800, color: "#0D2B5E" }}>{candidate.name}</span>
         <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 12, background: rs.bg, color: rs.text }}>{candidate.reading}</span>
         <span style={{ fontSize: 11, background: "#E8F2FC", color: "#1A5BA6", borderRadius: 8, padding: "2px 8px" }}>{candidate.phase}</span>
