@@ -131,6 +131,7 @@ function BasicInfoTab({ candidate, onUpdate }: {
     minOffer: String(candidate.minOffer ?? ""),
     maxOffer: String(candidate.maxOffer ?? ""),
     memo: candidate.memo ?? "",
+    trustRank: candidate.trustRank ?? "" as string,
   });
 
   const toggleJob = (job: string) => {
@@ -161,6 +162,7 @@ function BasicInfoTab({ candidate, onUpdate }: {
       minOffer: form.minOffer ? Number(form.minOffer) : undefined,
       maxOffer: form.maxOffer ? Number(form.maxOffer) : undefined,
       memo: form.memo || undefined,
+      trustRank: (form.trustRank as Candidate["trustRank"]) || undefined,
     };
     await updateCandidate(candidate.id, updates);
     onUpdate({ ...candidate, ...updates });
@@ -194,6 +196,27 @@ function BasicInfoTab({ candidate, onUpdate }: {
               style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13 }}>
               {["A","B","C","D","E","F","G"].map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
+          </div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 6 }}>信頼ランク</label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["A","B","C","D","E"] as const).map((r) => {
+                const colors: Record<string, string> = { A:"#22c55e", B:"#3b82f6", C:"#eab308", D:"#f97316", E:"#ef4444" };
+                const selected = form.trustRank === r;
+                return (
+                  <button key={r} type="button" onClick={() => setForm({ ...form, trustRank: selected ? "" : r })}
+                    style={{ width: 40, height: 40, borderRadius: "50%", border: selected ? "3px solid #0D2B5E" : "2px solid #C8DFF5", background: selected ? colors[r] : "#fff", color: selected ? "#fff" : colors[r], fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+                    {r}
+                  </button>
+                );
+              })}
+              {form.trustRank && (
+                <button type="button" onClick={() => setForm({ ...form, trustRank: "" })}
+                  style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#9CAAB8", fontSize: 11, cursor: "pointer" }}>
+                  解除
+                </button>
+              )}
+            </div>
           </div>
           <div>
             <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>フェーズ</label>

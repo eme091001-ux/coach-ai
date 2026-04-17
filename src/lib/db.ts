@@ -565,6 +565,7 @@ export async function updateCandidate(
   if (updates.maxOffer !== undefined) patch.max_offer = updates.maxOffer;
   if (updates.nextAction !== undefined) patch.next_action = updates.nextAction;
   if (updates.memo !== undefined) patch.memo = updates.memo;
+  if (updates.trustRank !== undefined) patch.trust_rank = updates.trustRank || null;
   const { error } = await supabase.from('candidates').update(patch).eq('id', id);
   return !error;
 }
