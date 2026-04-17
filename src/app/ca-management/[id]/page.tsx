@@ -47,6 +47,22 @@ const READING_STYLE: Record<string, { bg: string; text: string }> = {
   G: { bg: "#F1F0E8", text: "#5F5E5A" },
 };
 
+const TRUST_RANK_COLOR: Record<string, string> = {
+  A: "#22c55e",
+  B: "#3b82f6",
+  C: "#eab308",
+  D: "#f97316",
+  E: "#ef4444",
+};
+const TRUST_RANK_ORDER = ["A", "B", "C", "D", "E"];
+function sortByTrustRank(candidates: import("@/lib/db").Candidate[]) {
+  return [...candidates].sort((a, b) => {
+    const ai = a.trustRank ? TRUST_RANK_ORDER.indexOf(a.trustRank) : TRUST_RANK_ORDER.length;
+    const bi = b.trustRank ? TRUST_RANK_ORDER.indexOf(b.trustRank) : TRUST_RANK_ORDER.length;
+    return ai - bi;
+  });
+}
+
 const ENTRY_STATUS: Record<string, { label: string; bg: string; text: string }> = {
   pending:   { label: "依頼中",        bg: "#FEF9C3", text: "#854D0E" },
   entered:   { label: "エントリー済",  bg: "#E8F2FC", text: "#1A5BA6" },
@@ -163,11 +179,12 @@ function CandidatesTab({ caId, candidates, loading, setCandidates, onAdd, onEdit
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {candidates.map((c) => {
+          {sortByTrustRank(candidates).map((c) => {
             const rs = READING_STYLE[c.reading] ?? READING_STYLE.G;
             const showOffer = ["A", "B", "C"].includes(c.reading);
             const isHovered = hoveredId === c.id;
             const fmtIncome = (v?: number) => v ? `${v}万` : "—";
+            const trustColor = c.trustRank ? TRUST_RANK_COLOR[c.trustRank] : "#9ca3af";
             return (
               <div key={c.id}
                 style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: "14px 16px", transition: "box-shadow 0.2s", boxShadow: isHovered ? "0 2px 12px rgba(59,143,212,0.12)" : "none", position: "relative" }}
@@ -175,6 +192,10 @@ function CandidatesTab({ caId, candidates, loading, setCandidates, onAdd, onEdit
                 onMouseLeave={() => setHoveredId(null)}>
                 {/* Top row */}
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  {/* Trust rank badge */}
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: trustColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, flexShrink: 0 }}>
+                    {c.trustRank ?? "—"}
+                  </div>
                   {/* Left info */}
                   <Link href={`/ca-management/${caId}/candidates/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>

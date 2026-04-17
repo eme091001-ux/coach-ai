@@ -359,9 +359,10 @@ export interface TargetCompany {
   minIncome?: number;
   maxIncome?: number;
   // ── Step1 追加フィールド ──
-  media?: string;     // 媒体
-  minSales?: number;  // ミニマム売上（CA売上）
-  maxSales?: number;  // マックス売上（CA売上）
+  media?: string;      // 媒体
+  minSales?: number;   // 旧フィールド（後方互換）
+  maxSales?: number;   // 旧フィールド（後方互換）
+  unitPrice?: number;  // 単価（万円）
   status: 'considering' | 'entered' | 'interviewing' | 'offered' | 'declined' | 'rejected';
   recommendation?: string;
   createdAt: string;
@@ -388,6 +389,7 @@ export interface Candidate {
   maxOffer?: number;
   nextAction?: string;
   memo?: string;
+  trustRank?: 'A' | 'B' | 'C' | 'D' | 'E';
   createdAt: string;
   updatedAt: string;
 }
@@ -414,6 +416,7 @@ export function mapDbCandidateToApp(row: Record<string, unknown>): Candidate {
     maxOffer: row.max_offer as number | undefined,
     nextAction: row.next_action as string | undefined,
     memo: row.memo as string | undefined,
+    trustRank: row.trust_rank as Candidate['trustRank'] | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };

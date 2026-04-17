@@ -480,8 +480,8 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
 
 // ── Tab 4: Entry Companies (Step1: 媒体・売上・10社同時入力対応) ───────────────
 
-type EntryRow = { name: string; media: string; customMedia: string; jobType: string; minSales: string; maxSales: string };
-const EMPTY_ROW: EntryRow = { name: "", media: "", customMedia: "", jobType: "", minSales: "", maxSales: "" };
+type EntryRow = { name: string; media: string; customMedia: string; jobType: string; unitPrice: string };
+const EMPTY_ROW: EntryRow = { name: "", media: "", customMedia: "", jobType: "", unitPrice: "" };
 
 function TargetCompaniesTab({ candidate, onUpdate }: {
   candidate: Candidate;
@@ -524,8 +524,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
         name: r.name.trim(),
         jobType: r.jobType || undefined,
         media: r.customMedia.trim() || r.media || undefined,
-        minSales: r.minSales ? Number(r.minSales) : undefined,
-        maxSales: r.maxSales ? Number(r.maxSales) : undefined,
+        unitPrice: r.unitPrice ? Number(r.unitPrice) : undefined,
         status: "considering" as const,
         createdAt: new Date().toISOString(),
       }));
@@ -611,8 +610,8 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
             </div>
 
             {/* テーブルヘッダー */}
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 80px 80px 32px", gap: 6, marginBottom: 8, padding: "0 4px" }}>
-              {["企業名 *", "媒体", "職種", "MIN売上(万)", "MAX売上(万)", ""].map((h) => (
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 100px 32px", gap: 6, marginBottom: 8, padding: "0 4px" }}>
+              {["企業名 *", "媒体", "職種", "単価（万円）", ""].map((h) => (
                 <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9CAAB8" }}>{h}</span>
               ))}
             </div>
@@ -620,7 +619,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
             {/* 入力行 */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {rows.map((r, i) => (
-                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 80px 80px 32px", gap: 6, alignItems: "start" }}>
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 100px 32px", gap: 6, alignItems: "start" }}>
                   {/* 企業名 */}
                   <input value={r.name} onChange={(e) => updateRow(i, "name", e.target.value)}
                     placeholder="株式会社〇〇" style={inpSt} />
@@ -638,11 +637,8 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
                     <option value="">選択...</option>
                     {ENTRY_JOB_OPTIONS.map((j) => <option key={j} value={j}>{j}</option>)}
                   </select>
-                  {/* MIN売上 */}
-                  <input type="number" value={r.minSales} onChange={(e) => updateRow(i, "minSales", e.target.value)}
-                    placeholder="0" min={0} style={inpSt} />
-                  {/* MAX売上 */}
-                  <input type="number" value={r.maxSales} onChange={(e) => updateRow(i, "maxSales", e.target.value)}
+                  {/* 単価（万円） */}
+                  <input type="number" value={r.unitPrice} onChange={(e) => updateRow(i, "unitPrice", e.target.value)}
                     placeholder="0" min={0} style={inpSt} />
                   {/* 行削除 */}
                   <button onClick={() => removeRow(i)} disabled={rows.length === 1}
