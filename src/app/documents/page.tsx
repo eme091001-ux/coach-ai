@@ -1377,6 +1377,7 @@ function DocumentsPageInner() {
   const { data: authSession } = useSession();
   const tabParam = (searchParams.get("tab") as TabType) ?? "resume";
   const candidateParam = searchParams.get("candidate");
+  const nameParam = searchParams.get("name") ?? "";
 
   const [sessions, setSessions] = useState<FeedbackSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<FeedbackSession | null>(null);
@@ -1388,6 +1389,11 @@ function DocumentsPageInner() {
   const [careerDocId, setCareerDocId] = useState<string | null>(null);
   const [editingResumeData, setEditingResumeData] = useState<ResumeData | null>(null);
   const [editingCareerData, setEditingCareerData] = useState<CareerData | null>(null);
+  const [aiFile, setAiFile] = useState<{ base64: string; mediaType: string; fileName: string } | null>(null);
+  const [aiMemo, setAiMemo] = useState("");
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchFeedbackSessions().then(setSessions);
@@ -1425,6 +1431,40 @@ function DocumentsPageInner() {
     else selectTab("resume");
   }
 
+  async function handleAiGenerate() {
+    if (!aiFile && !aiMemo.trim()) return;
+    setAiGenerating(true);
+    setAiError("");
+    try {
+      const res = await fetch("/api/documents/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(aiFile && { file: aiFile.base64, mediaType: aiFile.mediaType, fileName: aiFile.fileName }),
+          ...(aiMemo.trim() && { memo: aiMemo.trim() }),
+        }),
+      });
+      const json = await res.json();
+      if (json.error) { setAiError(json.error); return; }
+      handleApplyImport(json);
+    } catch {
+      setAiError("生成に失敗しました。もう一度お試しください。");
+    } finally {
+      setAiGenerating(false);
+    }
+  }
+
+  function handleAiFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = (ev.target?.result as string).split(",")[1];
+      setAiFile({ base64, mediaType: file.type, fileName: file.name });
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handleEditDocument(doc: CandidateDocument) {
     if (doc.documentType === "resume") {
       setEditingResumeData(doc.documentData as ResumeData);
@@ -1454,13 +1494,66 @@ function DocumentsPageInner() {
       {/* Header */}
       <div className="no-print" style={{ marginBottom: 24, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0D2B5E", marginBottom: 4 }}>書類作成</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0D2B5E", marginBottom: 4 }}>
+            書類作成{nameParam ? ` — ${nameParam}` : ""}
+          </h1>
           <p style={{ fontSize: 13, color: "#4A6FA5" }}>面談データをもとに履歴書・職務経歴書・面接対策シートをAI自動生成します</p>
         </div>
         <button onClick={() => setShowImportModal(true)}
           style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", whiteSpace: "nowrap" }}>
           <Upload size={15} />📎 既存書類を読み込む
         </button>
+      </div>
+
+      {/* AI自動生成セクション */}
+      <div className="no-print" style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E", marginBottom: 16, display: "flex", alignItems: "center", gap: 6 }}>
+          <Sparkles size={15} color="#3B8FD4" /> AIで書類を自動生成
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* 既存書類アップロード */}
+          <div>
+            <p style={{ fontSize: 11, color: "#9CAAB8", marginBottom: 6, fontWeight: 600 }}>既存書類を読み込む（任意）</p>
+            <div
+              onClick={() => aiFileInputRef.current?.click()}
+              style={{ border: aiFile ? "2px solid #3B8FD4" : "2px dashed #C8DFF5", borderRadius: 8, padding: "16px 12px", textAlign: "center", cursor: "pointer", background: aiFile ? "#EBF5FF" : "#F7FAFF", transition: "all 0.2s" }}>
+              <input ref={aiFileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={handleAiFileChange} />
+              {aiFile ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <FileText size={16} color="#3B8FD4" />
+                  <span style={{ fontSize: 12, color: "#0D2B5E", fontWeight: 600 }}>{aiFile.fileName}</span>
+                  <button onClick={(e) => { e.stopPropagation(); setAiFile(null); if (aiFileInputRef.current) aiFileInputRef.current.value = ""; }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#9CAAB8", padding: 0 }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Upload size={20} color="#C8DFF5" style={{ marginBottom: 4, display: "inline-block" }} />
+                  <p style={{ fontSize: 12, color: "#9CAAB8" }}>PDF / Word をクリックして選択</p>
+                </>
+              )}
+            </div>
+          </div>
+          {/* メモ入力 */}
+          <div>
+            <p style={{ fontSize: 11, color: "#9CAAB8", marginBottom: 6, fontWeight: 600 }}>面談メモ・議事録（任意）</p>
+            <textarea
+              value={aiMemo}
+              onChange={(e) => setAiMemo(e.target.value)}
+              placeholder="面談内容や求職者のメモを貼り付けてください"
+              rows={4}
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 12, color: "#0D2B5E", resize: "vertical", boxSizing: "border-box", outline: "none" }}
+            />
+          </div>
+        </div>
+        {aiError && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 10 }}>{aiError}</p>}
+        <div style={{ marginTop: 14 }}>
+          <button onClick={handleAiGenerate} disabled={aiGenerating || (!aiFile && !aiMemo.trim())}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: (aiGenerating || (!aiFile && !aiMemo.trim())) ? "#E0E8F0" : "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: (aiGenerating || (!aiFile && !aiMemo.trim())) ? "#9CAAB8" : "#fff", border: "none", cursor: (aiGenerating || (!aiFile && !aiMemo.trim())) ? "not-allowed" : "pointer" }}>
+            <Sparkles size={14} />{aiGenerating ? "生成中..." : "AIで自動生成"}
+          </button>
+        </div>
       </div>
 
       {/* Candidate selector */}

@@ -591,6 +591,14 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
           </div>
         )}
       </div>
+
+      {/* ── 書類作成リンク ── */}
+      <div style={{ textAlign: "center", paddingTop: 4 }}>
+        <Link href={`/documents?candidateId=${candidateId}&name=${encodeURIComponent(candidateName)}`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 22px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", textDecoration: "none" }}>
+          <Plus size={14} /> 書類を作成する
+        </Link>
+      </div>
     </div>
   );
 }

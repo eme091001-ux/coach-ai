@@ -329,7 +329,7 @@ export async function uploadCandidateFile(
 export async function saveUploadedDocument(params: {
   candidateId: string;
   candidateName: string;
-  caId: string;
+  caId?: string;
   documentType: "resume" | "cv" | "career" | "other";
   fileName: string;
   fileUrl: string;
@@ -340,14 +340,17 @@ export async function saveUploadedDocument(params: {
     .insert({
       candidate_id: params.candidateId,
       candidate_name: params.candidateName,
-      ca_id: params.caId,
       document_type: params.documentType,
       file_name: params.fileName,
       file_url: params.fileUrl,
     })
     .select('id')
     .single();
-  if (error || !data) return null;
+  if (error) {
+    console.error('saveUploadedDocument error:', error);
+    return null;
+  }
+  if (!data) return null;
   return data.id as string;
 }
 
