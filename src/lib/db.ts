@@ -167,23 +167,6 @@ export async function fetchCAProfiles(): Promise<CAProfile[]> {
     }));
   }
 
-  // Try profiles table first
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, name, role, email')
-    .in('role', ['ca', 'manager', 'admin'])
-    .order('name');
-
-  if (profiles && profiles.length > 0) {
-    return profiles.map((p) => ({
-      id: p.id as string,
-      name: p.name as string,
-      role: p.role as string,
-      email: p.email as string | undefined,
-    }));
-  }
-
-  // Fall back to staffs table
   const { data: staffs } = await supabase
     .from('staffs')
     .select('id, name, role, email')
@@ -211,7 +194,7 @@ export async function fetchUserRole(
 ): Promise<'admin' | 'manager' | 'ca'> {
   if (!isSupabaseConfigured()) return 'admin';
   const { data } = await supabase
-    .from('profiles')
+    .from('staffs')
     .select('role')
     .eq('email', email)
     .single();
@@ -567,6 +550,7 @@ export async function updateCandidate(
   if (updates.memo !== undefined) patch.memo = updates.memo;
   if (updates.trustRank !== undefined) patch.trust_rank = updates.trustRank || null;
   const { error } = await supabase.from('candidates').update(patch).eq('id', id);
+  if (error) console.error('updateCandidate error:', error);
   return !error;
 }
 

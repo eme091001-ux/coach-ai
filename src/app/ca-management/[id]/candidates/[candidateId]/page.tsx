@@ -164,7 +164,12 @@ function BasicInfoTab({ candidate, onUpdate }: {
       memo: form.memo || undefined,
       trustRank: (form.trustRank as Candidate["trustRank"]) || undefined,
     };
-    await updateCandidate(candidate.id, updates);
+    const ok = await updateCandidate(candidate.id, updates);
+    if (!ok) {
+      alert('保存に失敗しました。コンソールのエラーを確認してください。');
+      setSaving(false);
+      return;
+    }
     onUpdate({ ...candidate, ...updates });
     setSaving(false);
     setEditing(false);
