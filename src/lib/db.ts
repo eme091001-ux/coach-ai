@@ -226,7 +226,7 @@ export interface CandidateDocument {
   candidateName: string;
   caId?: string;
   caName?: string;
-  documentType: "resume" | "career" | "other";
+  documentType: "resume" | "cv" | "career" | "other";
   documentData?: unknown;
   photoUrl?: string;
   fileName?: string;
@@ -347,7 +347,7 @@ export async function saveUploadedDocument(params: {
   candidateId: string;
   candidateName: string;
   caId: string;
-  documentType: "resume" | "career" | "other";
+  documentType: "resume" | "cv" | "career" | "other";
   fileName: string;
   fileUrl: string;
 }): Promise<string | null> {

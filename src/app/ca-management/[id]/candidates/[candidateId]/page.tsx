@@ -16,16 +16,6 @@ import { ChevronLeft, Edit2, Plus, X, FileText, Building2, ClipboardList, User, 
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const READING_STYLE: Record<string, { bg: string; text: string }> = {
-  A: { bg: "#FEE2E2", text: "#991B1B" },
-  B: { bg: "#FEF9C3", text: "#854D0E" },
-  C: { bg: "#FEF9C3", text: "#854D0E" },
-  D: { bg: "#F1F0E8", text: "#5F5E5A" },
-  E: { bg: "#F1F0E8", text: "#5F5E5A" },
-  F: { bg: "#F1F0E8", text: "#5F5E5A" },
-  G: { bg: "#F1F0E8", text: "#5F5E5A" },
-};
-
 const TRUST_RANK_COLOR: Record<string, string> = {
   A: "#22c55e",
   B: "#3b82f6",
@@ -185,8 +175,6 @@ function BasicInfoTab({ candidate, onUpdate }: {
     </div>
   );
 
-  const rs = READING_STYLE[candidate.reading] ?? READING_STYLE.G;
-
   if (editing) {
     return (
       <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 24 }}>
@@ -330,8 +318,12 @@ function BasicInfoTab({ candidate, onUpdate }: {
     <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {candidate.trustRank && (
+            <div style={{ width: 48, height: 48, borderRadius: "50%", background: TRUST_RANK_COLOR[candidate.trustRank], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0 }}>
+              {candidate.trustRank}
+            </div>
+          )}
           <span style={{ fontSize: 18, fontWeight: 800, color: "#0D2B5E" }}>{candidate.name}</span>
-          <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 12, background: rs.bg, color: rs.text }}>{candidate.reading}</span>
           <span style={{ fontSize: 11, background: "#E8F2FC", color: "#1A5BA6", borderRadius: 8, padding: "2px 8px" }}>{candidate.phase}</span>
         </div>
         <button onClick={() => setEditing(true)}
@@ -432,7 +424,40 @@ function FeedbackHistoryTab({ candidateId, candidateName, caId }: {
 
 // ── Tab 3: Documents ──────────────────────────────────────────────────────────
 
-const DOC_TYPE_LABELS: Record<string, string> = { resume: "履歴書", career: "職務経歴書", other: "その他" };
+function DocFileRow({ doc, deletingId, onDelete }: {
+  doc: CandidateDocument;
+  deletingId: string | null;
+  onDelete: (doc: CandidateDocument) => void;
+}) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
+      <FileText size={16} color="#3B8FD4" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {doc.fileName ?? "書類"}
+        </p>
+        <span style={{ fontSize: 11, color: "#9CAAB8" }}>{new Date(doc.createdAt).toLocaleDateString("ja-JP")}</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+        {doc.fileUrl ? (
+          <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" download={doc.fileName}
+            style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
+            <Download size={12} /> DL
+          </a>
+        ) : (
+          <Link href={`/documents/${doc.id}`}
+            style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
+            編集 / PDF
+          </Link>
+        )}
+        <button onClick={() => onDelete(doc)} disabled={deletingId === doc.id}
+          style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FFF0F0", color: "#991B1B", fontSize: 12, cursor: "pointer" }}>
+          {deletingId === doc.id ? "..." : <><Trash2 size={12} /> 削除</>}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function DocumentsTab({ candidateName, caId, candidateId }: {
   candidateName: string;
@@ -441,10 +466,11 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
 }) {
   const [docs, setDocs] = useState<CandidateDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [docType, setDocType] = useState<"resume" | "career" | "other">("resume");
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [uploadingCv, setUploadingCv] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const cvInputRef = useRef<HTMLInputElement>(null);
 
   const loadDocs = useCallback(async () => {
     setLoading(true);
@@ -458,18 +484,23 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "resume" | "cv",
+    setUploading: (v: boolean) => void,
+    inputRef: React.RefObject<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
       const fileUrl = await uploadCandidateFile(file, candidateId);
       if (!fileUrl) { alert("アップロードに失敗しました。Supabase Storageの設定を確認してください。"); return; }
-      await saveUploadedDocument({ candidateId, candidateName, caId, documentType: docType, fileName: file.name, fileUrl });
+      await saveUploadedDocument({ candidateId, candidateName, caId, documentType: type, fileName: file.name, fileUrl });
       await loadDocs();
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (inputRef.current) inputRef.current.value = "";
     }
   };
 
@@ -481,75 +512,66 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
     setDeletingId(null);
   };
 
+  const resumeDocs = docs.filter((d) => d.documentType === "resume");
+  const cvDocs = docs.filter((d) => d.documentType === "cv" || d.documentType === "career");
+
+  const sectionStyle: React.CSSProperties = {
+    background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 16,
+  };
+  const uploadBtnStyle = (busy: boolean): React.CSSProperties => ({
+    display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8,
+    fontSize: 12, fontWeight: 600,
+    background: busy ? "#C8DFF5" : "linear-gradient(135deg,#0D2B5E,#1A5BA6)",
+    color: "#fff", cursor: busy ? "wait" : "pointer",
+  });
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>;
+
   return (
     <div>
-      {/* ── アップロードエリア ── */}
-      <div style={{ background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 12 }}>ファイルをアップロード（PDF / Word）</p>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <select value={docType} onChange={(e) => setDocType(e.target.value as typeof docType)}
-            style={{ fontSize: 12, border: "1px solid #C8DFF5", borderRadius: 8, padding: "7px 12px", color: "#0D2B5E", background: "#fff" }}>
-            <option value="resume">履歴書</option>
-            <option value="career">職務経歴書</option>
-            <option value="other">その他</option>
-          </select>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", cursor: uploading ? "wait" : "pointer" }}>
-            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload} style={{ display: "none" }} disabled={uploading} />
-            {uploading ? "アップロード中..." : "ファイルを選択"}
+      {/* ── 履歴書セクション ── */}
+      <div style={sectionStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>📄 履歴書</p>
+          <label style={uploadBtnStyle(uploadingResume)}>
+            <input ref={resumeInputRef} type="file" accept=".pdf,.doc,.docx"
+              onChange={(e) => handleUpload(e, "resume", setUploadingResume, resumeInputRef)}
+              style={{ display: "none" }} disabled={uploadingResume} />
+            {uploadingResume ? "アップロード中..." : <><Plus size={12} /> アップロード</>}
           </label>
         </div>
+        {resumeDocs.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#9CAAB8", textAlign: "center", padding: "20px 0" }}>履歴書が登録されていません</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {resumeDocs.map((d) => (
+              <DocFileRow key={d.id} doc={d} deletingId={deletingId} onDelete={handleDelete} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ── 書類一覧 ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <p style={{ fontSize: 13, color: "#9CAAB8" }}>{candidateName} の書類一覧</p>
-        <Link href={`/documents?caId=${caId}&candidateId=${candidateId}&candidateName=${encodeURIComponent(candidateName)}`}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "#EBF5FF", color: "#1A5BA6", textDecoration: "none", border: "1px solid #BFDBFE" }}>
-          <Plus size={13} /> 書類を作成
-        </Link>
+      {/* ── 職務経歴書セクション ── */}
+      <div style={sectionStyle}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>📋 職務経歴書</p>
+          <label style={uploadBtnStyle(uploadingCv)}>
+            <input ref={cvInputRef} type="file" accept=".pdf,.doc,.docx"
+              onChange={(e) => handleUpload(e, "cv", setUploadingCv, cvInputRef)}
+              style={{ display: "none" }} disabled={uploadingCv} />
+            {uploadingCv ? "アップロード中..." : <><Plus size={12} /> アップロード</>}
+          </label>
+        </div>
+        {cvDocs.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#9CAAB8", textAlign: "center", padding: "20px 0" }}>職務経歴書が登録されていません</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {cvDocs.map((d) => (
+              <DocFileRow key={d.id} doc={d} deletingId={deletingId} onDelete={handleDelete} />
+            ))}
+          </div>
+        )}
       </div>
-
-      {loading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>
-      ) : docs.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12 }}>
-          <p style={{ fontSize: 14, color: "#9CAAB8" }}>書類がありません</p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {docs.map((d) => (
-            <div key={d.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-              <FileText size={18} color="#3B8FD4" style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {d.fileName ?? DOC_TYPE_LABELS[d.documentType] ?? "書類"}
-                </p>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={{ fontSize: 11, background: "#EBF5FF", color: "#1A5BA6", borderRadius: 6, padding: "1px 7px", flexShrink: 0 }}>{DOC_TYPE_LABELS[d.documentType] ?? d.documentType}</span>
-                  <span style={{ fontSize: 11, color: "#9CAAB8" }}>{new Date(d.createdAt).toLocaleDateString("ja-JP")}</span>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                {d.fileUrl ? (
-                  <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" download={d.fileName}
-                    style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
-                    <Download size={12} /> DL
-                  </a>
-                ) : (
-                  <Link href={`/documents/${d.id}`}
-                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
-                    編集 / PDF
-                  </Link>
-                )}
-                <button onClick={() => handleDelete(d)} disabled={deletingId === d.id}
-                  style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FFF0F0", color: "#991B1B", fontSize: 12, cursor: "pointer" }}>
-                  {deletingId === d.id ? "..." : <><Trash2 size={12} /> 削除</>}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -1320,8 +1342,6 @@ export default function CandidateDetailPage() {
     </div>
   );
 
-  const rs = READING_STYLE[candidate.reading] ?? READING_STYLE.G;
-
   return (
     <div style={{ maxWidth: 800, margin: "0 auto", padding: "24px 20px" }}>
       {/* Header */}
@@ -1332,12 +1352,11 @@ export default function CandidateDetailPage() {
         </Link>
         <span style={{ fontSize: 10, color: "#C8DFF5" }}>|</span>
         {candidate.trustRank && (
-          <div style={{ width: 36, height: 36, borderRadius: "50%", background: TRUST_RANK_COLOR[candidate.trustRank] ?? "#9ca3af", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, flexShrink: 0 }}>
+          <div style={{ width: 48, height: 48, borderRadius: "50%", background: TRUST_RANK_COLOR[candidate.trustRank], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0 }}>
             {candidate.trustRank}
           </div>
         )}
         <span style={{ fontSize: 16, fontWeight: 800, color: "#0D2B5E" }}>{candidate.name}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 12, background: rs.bg, color: rs.text }}>{candidate.reading}</span>
         <span style={{ fontSize: 11, background: "#E8F2FC", color: "#1A5BA6", borderRadius: 8, padding: "2px 8px" }}>{candidate.phase}</span>
       </div>
 
