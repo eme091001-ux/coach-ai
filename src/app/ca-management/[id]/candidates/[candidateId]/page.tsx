@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -8,11 +8,11 @@ import {
   fetchFeedbackSessionsByCandidateId,
   fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
   updateEntryRecommendation,
-  fetchDocuments,
+  fetchDocuments, fetchDocumentsByCandidateId, uploadCandidateFile, saveUploadedDocument, deleteDocument,
   Candidate, CandidateDocument, EntryRequest, TargetCompany,
 } from "@/lib/db";
 import { FeedbackSession } from "@/types";
-import { ChevronLeft, Edit2, Plus, X, FileText, Building2, ClipboardList, User } from "lucide-react";
+import { ChevronLeft, Edit2, Plus, X, FileText, Building2, ClipboardList, User, Download, Trash2 } from "lucide-react";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -432,6 +432,8 @@ function FeedbackHistoryTab({ candidateId, candidateName, caId }: {
 
 // ── Tab 3: Documents ──────────────────────────────────────────────────────────
 
+const DOC_TYPE_LABELS: Record<string, string> = { resume: "履歴書", career: "職務経歴書", other: "その他" };
+
 function DocumentsTab({ candidateName, caId, candidateId }: {
   candidateName: string;
   caId: string;
@@ -439,25 +441,74 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
 }) {
   const [docs, setDocs] = useState<CandidateDocument[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState<"resume" | "career" | "other">("resume");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchDocuments(caId).then((all) => {
-      setDocs(all.filter((d) => d.candidateName === candidateName));
-      setLoading(false);
-    });
-  }, [caId, candidateName]);
+  const loadDocs = useCallback(async () => {
+    setLoading(true);
+    const [uploaded, created] = await Promise.all([
+      fetchDocumentsByCandidateId(candidateId),
+      fetchDocuments(caId).then((all) => all.filter((d) => d.candidateName === candidateName && !d.fileUrl)),
+    ]);
+    setDocs([...uploaded, ...created]);
+    setLoading(false);
+  }, [candidateId, caId, candidateName]);
 
-  const docTypeLabel = (t: string) => t === "resume" ? "履歴書" : "職務経歴書";
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fileUrl = await uploadCandidateFile(file, candidateId);
+      if (!fileUrl) { alert("アップロードに失敗しました。Supabase Storageの設定を確認してください。"); return; }
+      await saveUploadedDocument({ candidateId, candidateName, caId, documentType: docType, fileName: file.name, fileUrl });
+      await loadDocs();
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async (doc: CandidateDocument) => {
+    if (!confirm("この書類を削除しますか？")) return;
+    setDeletingId(doc.id);
+    await deleteDocument(doc.id);
+    setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+    setDeletingId(null);
+  };
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      {/* ── アップロードエリア ── */}
+      <div style={{ background: "#F7FAFF", border: "1px dashed #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 12 }}>ファイルをアップロード（PDF / Word）</p>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <select value={docType} onChange={(e) => setDocType(e.target.value as typeof docType)}
+            style={{ fontSize: 12, border: "1px solid #C8DFF5", borderRadius: 8, padding: "7px 12px", color: "#0D2B5E", background: "#fff" }}>
+            <option value="resume">履歴書</option>
+            <option value="career">職務経歴書</option>
+            <option value="other">その他</option>
+          </select>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", cursor: uploading ? "wait" : "pointer" }}>
+            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" onChange={handleUpload} style={{ display: "none" }} disabled={uploading} />
+            {uploading ? "アップロード中..." : "ファイルを選択"}
+          </label>
+        </div>
+      </div>
+
+      {/* ── 書類一覧 ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <p style={{ fontSize: 13, color: "#9CAAB8" }}>{candidateName} の書類一覧</p>
         <Link href={`/documents?caId=${caId}&candidateId=${candidateId}&candidateName=${encodeURIComponent(candidateName)}`}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "linear-gradient(135deg,#0D2B5E,#1A5BA6)", color: "#fff", textDecoration: "none" }}>
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, background: "#EBF5FF", color: "#1A5BA6", textDecoration: "none", border: "1px solid #BFDBFE" }}>
           <Plus size={13} /> 書類を作成
         </Link>
       </div>
+
       {loading ? (
         <div style={{ padding: 40, textAlign: "center", color: "#9CAAB8" }}>読み込み中...</div>
       ) : docs.length === 0 ? (
@@ -468,15 +519,33 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {docs.map((d) => (
             <div key={d.id} style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-              <FileText size={18} color="#3B8FD4" />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#0D2B5E", marginBottom: 2 }}>{docTypeLabel(d.documentType)}</p>
-                <p style={{ fontSize: 11, color: "#9CAAB8" }}>{new Date(d.createdAt).toLocaleDateString("ja-JP")}</p>
+              <FileText size={18} color="#3B8FD4" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#0D2B5E", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {d.fileName ?? DOC_TYPE_LABELS[d.documentType] ?? "書類"}
+                </p>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, background: "#EBF5FF", color: "#1A5BA6", borderRadius: 6, padding: "1px 7px", flexShrink: 0 }}>{DOC_TYPE_LABELS[d.documentType] ?? d.documentType}</span>
+                  <span style={{ fontSize: 11, color: "#9CAAB8" }}>{new Date(d.createdAt).toLocaleDateString("ja-JP")}</span>
+                </div>
               </div>
-              <Link href={`/documents/${d.id}`}
-                style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
-                編集 / PDF
-              </Link>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {d.fileUrl ? (
+                  <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" download={d.fileName}
+                    style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
+                    <Download size={12} /> DL
+                  </a>
+                ) : (
+                  <Link href={`/documents/${d.id}`}
+                    style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #C8DFF5", background: "#fff", color: "#4A6FA5", fontSize: 12, textDecoration: "none" }}>
+                    編集 / PDF
+                  </Link>
+                )}
+                <button onClick={() => handleDelete(d)} disabled={deletingId === d.id}
+                  style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 10px", borderRadius: 8, border: "1px solid #FCA5A5", background: "#FFF0F0", color: "#991B1B", fontSize: 12, cursor: "pointer" }}>
+                  {deletingId === d.id ? "..." : <><Trash2 size={12} /> 削除</>}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -500,7 +569,19 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
   const [editingRec, setEditingRec] = useState<string | null>(null);
   const [recText, setRecText] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
-  const companies = candidate.targetCompanies ?? [];
+  // ローカル state で管理することでページ内保持・stale closure を防止
+  const [companies, setCompanies] = useState<TargetCompany[]>(candidate.targetCompanies ?? []);
+
+  // 親 candidate が切り替わった場合だけ同期
+  useEffect(() => {
+    setCompanies(candidate.targetCompanies ?? []);
+  }, [candidate.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveCompanies = async (updated: TargetCompany[]) => {
+    setCompanies(updated);
+    await updateCandidate(candidate.id, { targetCompanies: updated });
+    onUpdate({ ...candidate, targetCompanies: updated });
+  };
 
   const openModal = () => {
     setRows([{ ...EMPTY_ROW }]);
@@ -535,9 +616,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
         status: "considering" as const,
         createdAt: new Date().toISOString(),
       }));
-      const updated = [...companies, ...added];
-      await updateCandidate(candidate.id, { targetCompanies: updated });
-      onUpdate({ ...candidate, targetCompanies: updated });
+      await saveCompanies([...companies, ...added]);
       setShowModal(false);
     } finally {
       setSaving(false);
@@ -545,15 +624,11 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
   };
 
   const handleStatusChange = async (companyId: string, status: TargetCompany["status"]) => {
-    const updated = companies.map((c) => c.id === companyId ? { ...c, status } : c);
-    await updateCandidate(candidate.id, { targetCompanies: updated });
-    onUpdate({ ...candidate, targetCompanies: updated });
+    await saveCompanies(companies.map((c) => c.id === companyId ? { ...c, status } : c));
   };
 
   const handleSaveRec = async (companyId: string) => {
-    const updated = companies.map((c) => c.id === companyId ? { ...c, recommendation: recText } : c);
-    await updateCandidate(candidate.id, { targetCompanies: updated });
-    onUpdate({ ...candidate, targetCompanies: updated });
+    await saveCompanies(companies.map((c) => c.id === companyId ? { ...c, recommendation: recText } : c));
     setEditingRec(null);
   };
 
@@ -578,9 +653,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
       });
       if (res.ok) {
         const { text } = await res.json();
-        const updated = companies.map((c) => c.id === companyId ? { ...c, recommendation: text } : c);
-        await updateCandidate(candidate.id, { targetCompanies: updated });
-        onUpdate({ ...candidate, targetCompanies: updated });
+        await saveCompanies(companies.map((c) => c.id === companyId ? { ...c, recommendation: text } : c));
       }
     } finally {
       setGenerating(null);
@@ -589,9 +662,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
 
   const handleRemove = async (companyId: string) => {
     if (!confirm("この企業を削除しますか？")) return;
-    const updated = companies.filter((c) => c.id !== companyId);
-    await updateCandidate(candidate.id, { targetCompanies: updated });
-    onUpdate({ ...candidate, targetCompanies: updated });
+    await saveCompanies(companies.filter((c) => c.id !== companyId));
   };
 
   const inpSt: React.CSSProperties = { width: "100%", padding: "6px 8px", border: "1px solid #C8DFF5", borderRadius: 6, fontSize: 12, boxSizing: "border-box", color: "#0D2B5E", background: "#fff" };
@@ -616,11 +687,11 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
           <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: "12px 16px" }}>
             <p style={{ fontSize: 10, color: "#166534", marginBottom: 4 }}>ミニマム単価</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: "#15803D" }}>{minUnitPrice.toLocaleString()}万円</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "#15803D" }}>{minUnitPrice.toLocaleString()}円</p>
           </div>
           <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: "12px 16px" }}>
             <p style={{ fontSize: 10, color: "#1D4ED8", marginBottom: 4 }}>マックス単価</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: "#1D4ED8" }}>{maxUnitPrice!.toLocaleString()}万円</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: "#1D4ED8" }}>{maxUnitPrice!.toLocaleString()}円</p>
           </div>
         </div>
       )}
@@ -636,7 +707,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
 
             {/* テーブルヘッダー */}
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1.6fr 1.4fr 100px 32px", gap: 6, marginBottom: 8, padding: "0 4px" }}>
-              {["企業名 *", "媒体", "職種", "単価（万円）", ""].map((h) => (
+              {["企業名 *", "媒体", "職種", "単価（円）", ""].map((h) => (
                 <span key={h} style={{ fontSize: 10, fontWeight: 600, color: "#9CAAB8" }}>{h}</span>
               ))}
             </div>
@@ -662,7 +733,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
                     <option value="">選択...</option>
                     {ENTRY_JOB_OPTIONS.map((j) => <option key={j} value={j}>{j}</option>)}
                   </select>
-                  {/* 単価（万円） */}
+                  {/* 単価（円） */}
                   <input type="number" value={r.unitPrice} onChange={(e) => updateRow(i, "unitPrice", e.target.value)}
                     placeholder="0" min={0} style={inpSt} />
                   {/* 行削除 */}
@@ -716,7 +787,7 @@ function TargetCompaniesTab({ candidate, onUpdate }: {
                       {c.media && <span style={{ fontSize: 11, background: "#EBF5FF", border: "1px solid #C8DFF5", borderRadius: 6, padding: "1px 7px", color: "#1A5BA6" }}>{c.media}</span>}
                       {c.unitPrice !== undefined && (
                         <span style={{ fontSize: 11, background: "#DCFCE7", border: "1px solid #BBF7D0", borderRadius: 6, padding: "1px 7px", color: "#166534", fontWeight: 600 }}>
-                          単価：{c.unitPrice}万円
+                          単価：{c.unitPrice?.toLocaleString()}円
                         </span>
                       )}
                     </div>

@@ -222,12 +222,15 @@ export async function fetchUserRole(
 
 export interface CandidateDocument {
   id: string;
+  candidateId?: string;
   candidateName: string;
   caId?: string;
   caName?: string;
-  documentType: "resume" | "career";
-  documentData: unknown;
+  documentType: "resume" | "career" | "other";
+  documentData?: unknown;
   photoUrl?: string;
+  fileName?: string;
+  fileUrl?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -235,12 +238,15 @@ export interface CandidateDocument {
 function mapDbDocToApp(row: Record<string, unknown>): CandidateDocument {
   return {
     id: row.id as string,
+    candidateId: row.candidate_id as string | undefined,
     candidateName: row.candidate_name as string,
     caId: row.ca_id as string | undefined,
     caName: row.ca_name as string | undefined,
-    documentType: row.document_type as "resume" | "career",
+    documentType: (row.document_type as CandidateDocument['documentType']) ?? 'other',
     documentData: row.document_data,
     photoUrl: row.photo_url as string | undefined,
+    fileName: row.file_name as string | undefined,
+    fileUrl: row.file_url as string | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -305,6 +311,61 @@ export async function deleteDocument(id: string): Promise<boolean> {
     .delete()
     .eq('id', id);
   return !error;
+}
+
+export async function fetchDocumentsByCandidateId(candidateId: string): Promise<CandidateDocument[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('candidate_documents')
+    .select('*')
+    .eq('candidate_id', candidateId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data.map(mapDbDocToApp);
+}
+
+export async function uploadCandidateFile(
+  file: File,
+  candidateId: string
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const path = `candidate-files/${candidateId}/${Date.now()}.${ext}`;
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .upload(path, file, { upsert: false });
+    if (error || !data) return null;
+    const { data: urlData } = supabase.storage.from('documents').getPublicUrl(data.path);
+    return urlData.publicUrl;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveUploadedDocument(params: {
+  candidateId: string;
+  candidateName: string;
+  caId: string;
+  documentType: "resume" | "career" | "other";
+  fileName: string;
+  fileUrl: string;
+}): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await supabase
+    .from('candidate_documents')
+    .insert({
+      candidate_id: params.candidateId,
+      candidate_name: params.candidateName,
+      ca_id: params.caId,
+      document_type: params.documentType,
+      file_name: params.fileName,
+      file_url: params.fileUrl,
+    })
+    .select('id')
+    .single();
+  if (error || !data) return null;
+  return data.id as string;
 }
 
 export async function uploadDocumentPhoto(

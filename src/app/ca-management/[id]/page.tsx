@@ -193,14 +193,13 @@ function CandidatesTab({ caId, candidates, loading, setCandidates, onAdd, onEdit
                 {/* Top row */}
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   {/* Trust rank badge */}
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: trustColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, flexShrink: 0 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: trustColor, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flexShrink: 0 }}>
                     {c.trustRank ?? "—"}
                   </div>
                   {/* Left info */}
                   <Link href={`/ca-management/${caId}/candidates/${c.id}`} style={{ flex: 1, minWidth: 0, textDecoration: "none" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <p style={{ fontSize: 14, fontWeight: 700, color: "#0D2B5E" }}>{c.name}</p>
-                      <span style={{ fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: rs.bg, color: rs.text }}>{c.reading}</span>
                       <span style={{ fontSize: 10, color: "#4A6FA5", background: "#EBF5FF", borderRadius: 8, padding: "1px 7px" }}>{c.phase}</span>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 4 }}>
