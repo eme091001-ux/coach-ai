@@ -8,7 +8,7 @@ import {
   fetchFeedbackSessionsByCandidateId,
   fetchEntryRequestsByCandidateId, addEntryRequest, updateEntryStatus,
   updateEntryRecommendation,
-  fetchDocuments, fetchDocumentsByCandidateId, uploadCandidateFile, saveUploadedDocument, deleteDocument,
+  fetchDocumentsByCandidateId, uploadCandidateFile, saveUploadedDocument, deleteDocument,
   Candidate, CandidateDocument, EntryRequest, TargetCompany,
 } from "@/lib/db";
 import { FeedbackSession } from "@/types";
@@ -474,13 +474,10 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
 
   const loadDocs = useCallback(async () => {
     setLoading(true);
-    const [uploaded, created] = await Promise.all([
-      fetchDocumentsByCandidateId(candidateId),
-      fetchDocuments(caId).then((all) => all.filter((d) => d.candidateName === candidateName && !d.fileUrl)),
-    ]);
-    setDocs([...uploaded, ...created]);
+    const uploaded = await fetchDocumentsByCandidateId(candidateId);
+    setDocs(uploaded);
     setLoading(false);
-  }, [candidateId, caId, candidateName]);
+  }, [candidateId]);
 
   useEffect(() => { loadDocs(); }, [loadDocs]);
 
@@ -513,7 +510,7 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
   };
 
   const resumeDocs = docs.filter((d) => d.documentType === "resume");
-  const cvDocs = docs.filter((d) => d.documentType === "cv" || d.documentType === "career");
+  const cvDocs = docs.filter((d) => d.documentType === "cv");
 
   const sectionStyle: React.CSSProperties = {
     background: "#fff", border: "1px solid #C8DFF5", borderRadius: 12, padding: 20, marginBottom: 16,
