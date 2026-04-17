@@ -196,13 +196,6 @@ function BasicInfoTab({ candidate, onUpdate }: {
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13, boxSizing: "border-box" }} />
           </div>
-          <div>
-            <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 4 }}>ランク</label>
-            <select value={form.reading} onChange={(e) => setForm({ ...form, reading: e.target.value })}
-              style={{ width: "100%", padding: "8px 12px", border: "1px solid #C8DFF5", borderRadius: 8, fontSize: 13 }}>
-              {["A","B","C","D","E","F","G"].map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
           <div style={{ gridColumn: "1/-1" }}>
             <label style={{ fontSize: 11, color: "#9CAAB8", display: "block", marginBottom: 6 }}>信頼ランク</label>
             <div style={{ display: "flex", gap: 6 }}>
