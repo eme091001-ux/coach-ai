@@ -514,7 +514,7 @@ function DocumentsTab({ candidateName, caId, candidateId }: {
     e: React.ChangeEvent<HTMLInputElement>,
     type: "resume" | "cv",
     setUploading: (v: boolean) => void,
-    inputRef: React.RefObject<HTMLInputElement>
+    inputRef: React.RefObject<HTMLInputElement | null>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
