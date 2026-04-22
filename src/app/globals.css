@@ -30,6 +30,9 @@ body {
 .resume-wrap {
   font-family: 'Noto Sans JP', sans-serif;
 }
+.resume-landscape {
+  font-family: 'Noto Sans JP', sans-serif;
+}
 .resume-table {
   width: 100%;
   border-collapse: collapse;
@@ -103,8 +106,20 @@ body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* landscape layout: two columns fill the page */
+  .resume-landscape-columns {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0 8px !important;
+    align-items: start !important;
+    width: 100% !important;
+  }
   @page {
     margin: 10mm;
     size: A4 portrait;
+  }
+  @page resume-landscape {
+    margin: 10mm;
+    size: A4 landscape;
   }
 }

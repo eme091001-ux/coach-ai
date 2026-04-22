@@ -651,6 +651,15 @@ function ResumeTab({
   const monthTd: React.CSSProperties = { border: "1px solid #333", padding: 2, width: "7%", textAlign: "center" };
   const contentTd: React.CSSProperties = { border: "1px solid #333", padding: 2 };
 
+  const handlePrint = () => {
+    const style = document.createElement("style");
+    style.id = "__resume-landscape-override__";
+    style.textContent = "@page { size: A4 landscape; margin: 10mm; }";
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => { document.getElementById("__resume-landscape-override__")?.remove(); }, 500);
+  };
+
   return (
     <div>
       {/* Action bar */}
@@ -659,9 +668,9 @@ function ResumeTab({
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: session ? "linear-gradient(135deg,#0D2B5E,#1A5BA6)" : "#E0E8F0", color: session ? "#fff" : "#9CAAB8", border: "none", cursor: session ? "pointer" : "not-allowed" }}>
           <Sparkles size={14} />{loading ? "生成中..." : "AI自動入力"}
         </button>
-        <button onClick={() => window.print()}
+        <button onClick={handlePrint}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>
-          <Printer size={14} />PDF印刷
+          <Printer size={14} />PDF印刷（A4横）
         </button>
         <button onClick={handleSave} disabled={saving}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>
@@ -670,273 +679,280 @@ function ResumeTab({
         {saveMsg && <span style={{ fontSize: 12, color: saveMsg.includes("✓") ? "#16A34A" : "#DC2626" }}>{saveMsg}</span>}
       </div>
 
-      {/* Resume form */}
-      <div className="resume-wrap print-full-width" style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: 20, maxWidth: 900 }}>
+      {/* Resume form — A4 landscape two-column layout */}
+      <div className="resume-landscape print-full-width" style={{ background: "#fff", border: "1px solid #C8DFF5", borderRadius: 10, padding: 16, maxWidth: 1140 }}>
 
-        {/* Header */}
+        {/* Full-width header */}
         <table style={{ width: "100%", marginBottom: 6, borderCollapse: "collapse", fontFamily: "'Noto Sans JP',sans-serif" }}>
           <tbody>
             <tr>
               <td style={{ fontSize: 22, fontWeight: 800, letterSpacing: "0.3em", padding: "4px 0" }}>履　歴　書</td>
               <td style={{ textAlign: "right", fontSize: 12, color: "#333", padding: "4px 0", whiteSpace: "nowrap" }}>
-                <input value={resume.birthdateYear ? todayStr : todayStr} readOnly
-                  className="resume-cell-input" style={{ textAlign: "right", width: "auto", fontSize: 12 }} />
+                <input value={todayStr} readOnly className="resume-cell-input" style={{ textAlign: "right", width: "auto", fontSize: 12 }} />
               </td>
             </tr>
           </tbody>
         </table>
 
-        {/* Basic info + photo */}
-        <table className="resume-table" style={{ marginBottom: 0 }}>
-          <colgroup>
-            <col style={{ width: "75%" }} />
-            <col style={{ width: "25%" }} />
-          </colgroup>
-          <tbody>
-            {/* Row: ふりがな */}
-            <tr>
-              <td style={tdLPad} rowSpan={1}>
-                <div style={labelStyle}>ふりがな</div>
-                <CI value={resume.furigana} onChange={s("furigana")} auto={isAuto("furigana")} placeholder="やまだ たろう" />
-              </td>
-              <td style={{ border: "1px solid #333", padding: 10, textAlign: "center", verticalAlign: "middle" }} rowSpan={8}>
-                <PhotoUpload
-                  photoDataUrl={resume.photoDataUrl}
-                  onPhotoChange={(url) => setResume((r) => ({ ...r, photoDataUrl: url }))}
-                />
-              </td>
-            </tr>
-            {/* Row: 氏名 */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={labelStyle}>氏名（漢字）</div>
-                <CI value={resume.name} onChange={s("name")} auto={isAuto("name")} placeholder="山田　太郎" bold large />
-              </td>
-            </tr>
-            {/* Row: 生年月日 */}
-            <tr>
-              <td style={{ ...tdLPad, whiteSpace: "nowrap" }}>
-                <div style={labelStyle}>生年月日</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
-                  <CI value={resume.birthdateYear} onChange={s("birthdateYear")} auto={isAuto("birthdate")} placeholder="1990" align="center" flex={2} />
-                  <span style={{ fontSize: 12 }}>年</span>
-                  <CI value={resume.birthdateMonth} onChange={s("birthdateMonth")} auto={isAuto("birthdate")} placeholder="1" align="center" flex={1} />
-                  <span style={{ fontSize: 12 }}>月</span>
-                  <CI value={resume.birthdateDay} onChange={s("birthdateDay")} auto={isAuto("birthdate")} placeholder="1" align="center" flex={1} />
-                  <span style={{ fontSize: 12 }}>日生　(満</span>
-                  <CI value={resume.age} onChange={s("age")} auto={isAuto("age")} placeholder="35" align="center" flex={1} />
-                  <span style={{ fontSize: 12 }}>歳)</span>
-                  <span style={{ fontSize: 12, marginLeft: 8 }}>性別</span>
-                  <CI value={resume.gender} onChange={s("gender")} auto={isAuto("gender")} placeholder="男・女" flex={2} />
-                </div>
-              </td>
-            </tr>
-            {/* Row: 現住所ふりがな */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={labelStyle}>ふりがな（現住所）</div>
-                <CI value={resume.addressKana} onChange={s("addressKana")} placeholder="とうきょうと..." />
-              </td>
-            </tr>
-            {/* Row: 現住所 */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                  <span style={{ ...labelStyle, whiteSpace: "nowrap" }}>現住所 〒</span>
-                  <CI value={resume.postalCode} onChange={s("postalCode")} auto={isAuto("postalCode")} placeholder="100-0001" />
-                </div>
-                <CI value={resume.address} onChange={s("address")} auto={isAuto("address")} placeholder="東京都千代田区..." />
-              </td>
-            </tr>
-            {/* Row: 現住所電話・メール */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={labelStyle}>電話</div>
-                    <CI value={resume.phone} onChange={s("phone")} auto={isAuto("phone")} placeholder="090-0000-0000" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={labelStyle}>Email</div>
-                    <CI value={resume.email} onChange={s("email")} auto={isAuto("email")} placeholder="example@email.com" />
-                  </div>
-                </div>
-              </td>
-            </tr>
-            {/* Row: 連絡先ふりがな */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={labelStyle}>ふりがな（連絡先）</div>
-                <CI value={resume.contactAddressKana} onChange={s("contactAddressKana")} placeholder="現住所以外に連絡を希望する場合のみ" />
-              </td>
-            </tr>
-            {/* Row: 連絡先 */}
-            <tr>
-              <td style={tdLPad}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                  <span style={{ ...labelStyle, whiteSpace: "nowrap" }}>連絡先 〒</span>
-                  <CI value={resume.contactPostalCode} onChange={s("contactPostalCode")} placeholder="（現住所以外に希望する場合のみ）" />
-                </div>
-                <CI value={resume.contactAddress} onChange={s("contactAddress")} placeholder="" />
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={labelStyle}>電話</div>
-                    <CI value={resume.contactPhone} onChange={s("contactPhone")} placeholder="090-0000-0000" />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={labelStyle}>Email</div>
-                    <CI value={resume.contactEmail} onChange={s("contactEmail")} placeholder="example@email.com" />
-                  </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        {/* Two-column body */}
+        <div className="resume-landscape-columns" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 10px", alignItems: "start" }}>
 
-        {/* Education / Work History table */}
-        <table className="resume-table" style={{ marginTop: 0 }}>
-          <colgroup><col style={{ width: "9%" }} /><col style={{ width: "7%" }} /><col /></colgroup>
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>年</th>
-              <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>月</th>
-              <th style={{ border: "1px solid #333", padding: 4, fontSize: 12 }}>学歴・職歴</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* 学歴 section */}
-            <tr><td style={sectionHeaderTd} /><td style={sectionHeaderTd} /><td style={sectionHeaderTd}>学歴</td></tr>
-            {resume.education.map((e, i) => (
-              <tr key={i}>
-                <td style={yearTd}><CI value={e.year} onChange={(v) => setRow("education", i, "year", v)} auto={isAuto("education")} align="center" placeholder="年" /></td>
-                <td style={monthTd}><CI value={e.month} onChange={(v) => setRow("education", i, "month", v)} auto={isAuto("education")} align="center" placeholder="月" /></td>
-                <td style={contentTd}>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <CI value={e.content} onChange={(v) => setRow("education", i, "content", v)} auto={isAuto("education")} placeholder="○○大学 ○○学部 卒業" />
-                    <button className="no-print" onClick={() => removeRow("education", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            <tr className="no-print">
-              <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
-                <button onClick={() => addRow("education")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 学歴を追加</button>
-              </td>
-            </tr>
+          {/* ===== LEFT COLUMN ===== */}
+          <div>
+            {/* Personal info + photo */}
+            <table className="resume-table" style={{ marginBottom: 0 }}>
+              <colgroup>
+                <col style={{ width: "75%" }} />
+                <col style={{ width: "25%" }} />
+              </colgroup>
+              <tbody>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={labelStyle}>ふりがな</div>
+                    <CI value={resume.furigana} onChange={s("furigana")} auto={isAuto("furigana")} placeholder="やまだ たろう" />
+                  </td>
+                  <td style={{ border: "1px solid #333", padding: 8, textAlign: "center", verticalAlign: "middle" }} rowSpan={8}>
+                    <PhotoUpload
+                      photoDataUrl={resume.photoDataUrl}
+                      onPhotoChange={(url) => setResume((r) => ({ ...r, photoDataUrl: url }))}
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={labelStyle}>氏名（漢字）</div>
+                    <CI value={resume.name} onChange={s("name")} auto={isAuto("name")} placeholder="山田　太郎" bold large />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ ...tdLPad, whiteSpace: "nowrap" }}>
+                    <div style={labelStyle}>生年月日</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
+                      <CI value={resume.birthdateYear} onChange={s("birthdateYear")} auto={isAuto("birthdate")} placeholder="1990" align="center" flex={2} />
+                      <span style={{ fontSize: 12 }}>年</span>
+                      <CI value={resume.birthdateMonth} onChange={s("birthdateMonth")} auto={isAuto("birthdate")} placeholder="1" align="center" flex={1} />
+                      <span style={{ fontSize: 12 }}>月</span>
+                      <CI value={resume.birthdateDay} onChange={s("birthdateDay")} auto={isAuto("birthdate")} placeholder="1" align="center" flex={1} />
+                      <span style={{ fontSize: 12 }}>日生　(満</span>
+                      <CI value={resume.age} onChange={s("age")} auto={isAuto("age")} placeholder="35" align="center" flex={1} />
+                      <span style={{ fontSize: 12 }}>歳)</span>
+                      <span style={{ fontSize: 12, marginLeft: 8 }}>性別</span>
+                      <CI value={resume.gender} onChange={s("gender")} auto={isAuto("gender")} placeholder="男・女" flex={2} />
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={labelStyle}>ふりがな（現住所）</div>
+                    <CI value={resume.addressKana} onChange={s("addressKana")} placeholder="とうきょうと..." />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                      <span style={{ ...labelStyle, whiteSpace: "nowrap" }}>現住所 〒</span>
+                      <CI value={resume.postalCode} onChange={s("postalCode")} auto={isAuto("postalCode")} placeholder="100-0001" />
+                    </div>
+                    <CI value={resume.address} onChange={s("address")} auto={isAuto("address")} placeholder="東京都千代田区..." />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>電話</div>
+                        <CI value={resume.phone} onChange={s("phone")} auto={isAuto("phone")} placeholder="090-0000-0000" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>Email</div>
+                        <CI value={resume.email} onChange={s("email")} auto={isAuto("email")} placeholder="example@email.com" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={labelStyle}>ふりがな（連絡先）</div>
+                    <CI value={resume.contactAddressKana} onChange={s("contactAddressKana")} placeholder="現住所以外に連絡を希望する場合のみ" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={tdLPad}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                      <span style={{ ...labelStyle, whiteSpace: "nowrap" }}>連絡先 〒</span>
+                      <CI value={resume.contactPostalCode} onChange={s("contactPostalCode")} placeholder="（現住所以外に希望する場合のみ）" />
+                    </div>
+                    <CI value={resume.contactAddress} onChange={s("contactAddress")} placeholder="" />
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>電話</div>
+                        <CI value={resume.contactPhone} onChange={s("contactPhone")} placeholder="090-0000-0000" />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={labelStyle}>Email</div>
+                        <CI value={resume.contactEmail} onChange={s("contactEmail")} placeholder="example@email.com" />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-            {/* Empty row */}
-            <tr><td style={{ ...yearTd, height: 20 }} /><td style={monthTd} /><td style={contentTd} /></tr>
+            {/* Education table */}
+            <table className="resume-table" style={{ marginTop: 0 }}>
+              <colgroup><col style={{ width: "9%" }} /><col style={{ width: "7%" }} /><col /></colgroup>
+              <thead>
+                <tr>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>年</th>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>月</th>
+                  <th style={{ border: "1px solid #333", padding: 4, fontSize: 12 }}>学歴・職歴</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style={sectionHeaderTd} /><td style={sectionHeaderTd} /><td style={sectionHeaderTd}>学歴</td></tr>
+                {resume.education.map((e, i) => (
+                  <tr key={i}>
+                    <td style={yearTd}><CI value={e.year} onChange={(v) => setRow("education", i, "year", v)} auto={isAuto("education")} align="center" placeholder="年" /></td>
+                    <td style={monthTd}><CI value={e.month} onChange={(v) => setRow("education", i, "month", v)} auto={isAuto("education")} align="center" placeholder="月" /></td>
+                    <td style={contentTd}>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <CI value={e.content} onChange={(v) => setRow("education", i, "content", v)} auto={isAuto("education")} placeholder="○○大学 ○○学部 卒業" />
+                        <button className="no-print" onClick={() => removeRow("education", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="no-print">
+                  <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
+                    <button onClick={() => addRow("education")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 学歴を追加</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-            {/* 職歴 section */}
-            <tr><td style={sectionHeaderTd} /><td style={sectionHeaderTd} /><td style={sectionHeaderTd}>職歴</td></tr>
-            {resume.workHistory.map((w, i) => (
-              <tr key={i}>
-                <td style={yearTd}><CI value={w.year} onChange={(v) => setRow("workHistory", i, "year", v)} auto={isAuto("workHistory")} align="center" placeholder="年" /></td>
-                <td style={monthTd}><CI value={w.month} onChange={(v) => setRow("workHistory", i, "month", v)} auto={isAuto("workHistory")} align="center" placeholder="月" /></td>
-                <td style={contentTd}>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <CI value={w.content} onChange={(v) => setRow("workHistory", i, "content", v)} auto={isAuto("workHistory")} placeholder="株式会社○○ 入社" />
-                    <button className="no-print" onClick={() => removeRow("workHistory", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            <tr className="no-print">
-              <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
-                <button onClick={() => addRow("workHistory")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 職歴を追加</button>
-              </td>
-            </tr>
+          {/* ===== RIGHT COLUMN ===== */}
+          <div>
+            {/* Work history table (学歴・職歴の続き) */}
+            <table className="resume-table" style={{ marginBottom: 0 }}>
+              <colgroup><col style={{ width: "9%" }} /><col style={{ width: "7%" }} /><col /></colgroup>
+              <thead>
+                <tr>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>年</th>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>月</th>
+                  <th style={{ border: "1px solid #333", padding: 4, fontSize: 12 }}>学歴・職歴（続き）</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td style={sectionHeaderTd} /><td style={sectionHeaderTd} /><td style={sectionHeaderTd}>職歴</td></tr>
+                {resume.workHistory.map((w, i) => (
+                  <tr key={i}>
+                    <td style={yearTd}><CI value={w.year} onChange={(v) => setRow("workHistory", i, "year", v)} auto={isAuto("workHistory")} align="center" placeholder="年" /></td>
+                    <td style={monthTd}><CI value={w.month} onChange={(v) => setRow("workHistory", i, "month", v)} auto={isAuto("workHistory")} align="center" placeholder="月" /></td>
+                    <td style={contentTd}>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <CI value={w.content} onChange={(v) => setRow("workHistory", i, "content", v)} auto={isAuto("workHistory")} placeholder="株式会社○○ 入社" />
+                        <button className="no-print" onClick={() => removeRow("workHistory", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="no-print">
+                  <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
+                    <button onClick={() => addRow("workHistory")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 職歴を追加</button>
+                  </td>
+                </tr>
+                <tr><td style={yearTd} /><td style={monthTd} /><td style={{ ...contentTd, textAlign: "right", padding: "4px 8px", fontSize: 12, fontFamily: "'Noto Sans JP',sans-serif" }}>以上</td></tr>
+              </tbody>
+            </table>
 
-            {/* 以上 */}
-            <tr><td style={yearTd} /><td style={monthTd} /><td style={{ ...contentTd, textAlign: "right", padding: "4px 8px", fontSize: 12, fontFamily: "'Noto Sans JP',sans-serif" }}>以上</td></tr>
-          </tbody>
-        </table>
+            {/* Licenses table */}
+            <table className="resume-table" style={{ marginTop: 0 }}>
+              <colgroup><col style={{ width: "9%" }} /><col style={{ width: "7%" }} /><col /></colgroup>
+              <thead>
+                <tr>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>年</th>
+                  <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>月</th>
+                  <th style={{ border: "1px solid #333", padding: 4, fontSize: 12 }}>免許・資格</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resume.licenses.map((l, i) => (
+                  <tr key={i}>
+                    <td style={yearTd}><CI value={l.year} onChange={(v) => setRow("licenses", i, "year", v)} auto={isAuto("licenses")} align="center" placeholder="年" /></td>
+                    <td style={monthTd}><CI value={l.month} onChange={(v) => setRow("licenses", i, "month", v)} auto={isAuto("licenses")} align="center" placeholder="月" /></td>
+                    <td style={contentTd}>
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <CI value={l.content} onChange={(v) => setRow("licenses", i, "content", v)} auto={isAuto("licenses")} placeholder="普通自動車第一種運転免許" />
+                        <button className="no-print" onClick={() => removeRow("licenses", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="no-print">
+                  <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
+                    <button onClick={() => addRow("licenses")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 資格を追加</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
 
-        {/* Licenses table */}
-        <table className="resume-table" style={{ marginTop: 0 }}>
-          <colgroup><col style={{ width: "9%" }} /><col style={{ width: "7%" }} /><col /></colgroup>
-          <thead>
-            <tr>
-              <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>年</th>
-              <th style={{ border: "1px solid #333", textAlign: "center", padding: 4, fontSize: 12 }}>月</th>
-              <th style={{ border: "1px solid #333", padding: 4, fontSize: 12 }}>免許・資格</th>
-            </tr>
-          </thead>
-          <tbody>
-            {resume.licenses.map((l, i) => (
-              <tr key={i}>
-                <td style={yearTd}><CI value={l.year} onChange={(v) => setRow("licenses", i, "year", v)} auto={isAuto("licenses")} align="center" placeholder="年" /></td>
-                <td style={monthTd}><CI value={l.month} onChange={(v) => setRow("licenses", i, "month", v)} auto={isAuto("licenses")} align="center" placeholder="月" /></td>
-                <td style={contentTd}>
-                  <div style={{ display: "flex", alignItems: "center" }}>
-                    <CI value={l.content} onChange={(v) => setRow("licenses", i, "content", v)} auto={isAuto("licenses")} placeholder="普通自動車第一種運転免許" />
-                    <button className="no-print" onClick={() => removeRow("licenses", i)} style={{ background: "none", border: "none", cursor: "pointer", color: "#F87171", padding: "0 4px", flexShrink: 0 }}><Trash2 size={11} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            <tr className="no-print">
-              <td colSpan={3} style={{ border: "1px solid #333", padding: "2px 4px" }}>
-                <button onClick={() => addRow("licenses")} style={{ fontSize: 11, color: "#3B8FD4", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 3 }}><Plus size={11} /> 資格を追加</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            {/* Self-PR / motivation + misc */}
+            <table className="resume-table" style={{ marginTop: 0 }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: "1px solid #333", padding: 6, width: "60%", verticalAlign: "top" }} rowSpan={5}>
+                    <div style={labelStyle}>志望の動機、特技、好きな学科、アピールポイントなど</div>
+                    {isAuto("motivation") && <AutoBadge />}
+                    <CIArea value={resume.motivation} onChange={s("motivation")} auto={isAuto("motivation")} placeholder="志望動機・特技・アピールポイントを入力..." rows={4} />
+                  </td>
+                  <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
+                    <div style={labelStyle}>通勤時間</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <span style={{ fontSize: 11 }}>約</span>
+                      <CI value={resume.commute} onChange={s("commute")} placeholder="30分" />
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
+                    <div style={labelStyle}>扶養家族数（配偶者を除く）</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <CI value={resume.dependents} onChange={s("dependents")} placeholder="0" />
+                      <span style={{ fontSize: 11 }}>人</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
+                    <div style={labelStyle}>配偶者</div>
+                    <CI value={resume.spouse} onChange={s("spouse")} placeholder="有・無" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
+                    <div style={labelStyle}>配偶者の扶養義務</div>
+                    <CI value={resume.spouseDependency} onChange={s("spouseDependency")} placeholder="有・無" />
+                  </td>
+                </tr>
+                <tr><td style={{ border: "1px solid #333", padding: 6 }} /></tr>
+              </tbody>
+            </table>
 
-        {/* Bottom: motivation + misc */}
-        <table className="resume-table" style={{ marginTop: 0 }}>
-          <tbody>
-            <tr>
-              <td style={{ border: "1px solid #333", padding: 6, width: "60%", verticalAlign: "top" }} rowSpan={5}>
-                <div style={labelStyle}>志望の動機、特技、好きな学科、アピールポイントなど</div>
-                {isAuto("motivation") && <AutoBadge />}
-                <CIArea value={resume.motivation} onChange={s("motivation")} auto={isAuto("motivation")} placeholder="志望動機・特技・アピールポイントを入力..." rows={6} />
-              </td>
-              <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
-                <div style={labelStyle}>通勤時間</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  <span style={{ fontSize: 11 }}>約</span>
-                  <CI value={resume.commute} onChange={s("commute")} placeholder="30分" />
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
-                <div style={labelStyle}>扶養家族数（配偶者を除く）</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  <CI value={resume.dependents} onChange={s("dependents")} placeholder="0" />
-                  <span style={{ fontSize: 11 }}>人</span>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
-                <div style={labelStyle}>配偶者</div>
-                <CI value={resume.spouse} onChange={s("spouse")} placeholder="有・無" />
-              </td>
-            </tr>
-            <tr>
-              <td style={{ border: "1px solid #333", padding: 6, verticalAlign: "top" }}>
-                <div style={labelStyle}>配偶者の扶養義務</div>
-                <CI value={resume.spouseDependency} onChange={s("spouseDependency")} placeholder="有・無" />
-              </td>
-            </tr>
-            <tr><td style={{ border: "1px solid #333", padding: 6 }} /></tr>
-          </tbody>
-        </table>
-
-        {/* 本人希望欄 */}
-        <table className="resume-table" style={{ marginTop: 0 }}>
-          <tbody>
-            <tr>
-              <td style={{ border: "1px solid #333", padding: 6 }}>
-                <div style={labelStyle}>本人希望記入欄（特に給料・職種・勤務時間・勤務地・その他について希望があれば記入）</div>
-                {isAuto("wish") && <AutoBadge />}
-                <CIArea value={resume.wish} onChange={s("wish")} auto={isAuto("wish")} placeholder="特に希望がない場合は「貴社規定に従います」とご記入ください" rows={3} />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+            {/* 本人希望欄（備考） */}
+            <table className="resume-table" style={{ marginTop: 0 }}>
+              <tbody>
+                <tr>
+                  <td style={{ border: "1px solid #333", padding: 6 }}>
+                    <div style={labelStyle}>本人希望記入欄（特に給料・職種・勤務時間・勤務地・その他について希望があれば記入）</div>
+                    {isAuto("wish") && <AutoBadge />}
+                    <CIArea value={resume.wish} onChange={s("wish")} auto={isAuto("wish")} placeholder="特に希望がない場合は「貴社規定に従います」とご記入ください" rows={2} />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );
