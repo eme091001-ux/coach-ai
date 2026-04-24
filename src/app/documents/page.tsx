@@ -711,7 +711,7 @@ function ResumeTab({
                     <div style={labelStyle}>ふりがな</div>
                     <CI value={resume.furigana} onChange={s("furigana")} auto={isAuto("furigana")} placeholder="やまだ たろう" />
                   </td>
-                  <td style={{ border: "1px solid #333", padding: 8, textAlign: "center", verticalAlign: "middle" }} rowSpan={8}>
+                  <td style={{ border: "1px solid #333", padding: 4, textAlign: "center", verticalAlign: "middle", width: 98 }} rowSpan={6}>
                     <PhotoUpload
                       photoDataUrl={resume.photoDataUrl}
                       onPhotoChange={(url) => setResume((r) => ({ ...r, photoDataUrl: url }))}
@@ -766,31 +766,6 @@ function ResumeTab({
                       <div style={{ flex: 1 }}>
                         <div style={labelStyle}>Email</div>
                         <CI value={resume.email} onChange={s("email")} auto={isAuto("email")} placeholder="example@email.com" />
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td style={tdLPad}>
-                    <div style={labelStyle}>ふりがな（連絡先）</div>
-                    <CI value={resume.contactAddressKana} onChange={s("contactAddressKana")} placeholder="現住所以外に連絡を希望する場合のみ" />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={tdLPad}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2 }}>
-                      <span style={{ ...labelStyle, whiteSpace: "nowrap" }}>連絡先 〒</span>
-                      <CI value={resume.contactPostalCode} onChange={s("contactPostalCode")} placeholder="（現住所以外に希望する場合のみ）" />
-                    </div>
-                    <CI value={resume.contactAddress} onChange={s("contactAddress")} placeholder="" />
-                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={labelStyle}>電話</div>
-                        <CI value={resume.contactPhone} onChange={s("contactPhone")} placeholder="090-0000-0000" />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={labelStyle}>Email</div>
-                        <CI value={resume.contactEmail} onChange={s("contactEmail")} placeholder="example@email.com" />
                       </div>
                     </div>
                   </td>
@@ -1399,7 +1374,8 @@ function DocumentsPageInner() {
   const [selectedSession, setSelectedSession] = useState<FeedbackSession | null>(null);
   const [showCandidateModal, setShowCandidateModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importedData, setImportedData] = useState<ParsedDocData | null>(null);
+  const [resumeImportedData, setResumeImportedData] = useState<ParsedDocData | null>(null);
+  const [careerImportedData, setCareerImportedData] = useState<ParsedDocData | null>(null);
   const [caProfiles, setCAProfiles] = useState<CAProfile[]>([]);
   const [resumeDocId, setResumeDocId] = useState<string | null>(null);
   const [careerDocId, setCareerDocId] = useState<string | null>(null);
@@ -1431,7 +1407,8 @@ function DocumentsPageInner() {
 
   function handleSelectCandidate(s: FeedbackSession) {
     setSelectedSession(s);
-    setImportedData(null);
+    setResumeImportedData(null);
+    setCareerImportedData(null);
     setResumeDocId(null);
     setCareerDocId(null);
     setEditingResumeData(null);
@@ -1442,9 +1419,15 @@ function DocumentsPageInner() {
   }
 
   function handleApplyImport(data: ParsedDocData) {
-    setImportedData(data);
-    if (data.documentType === "career") selectTab("career");
-    else selectTab("resume");
+    if (data.documentType === "career") {
+      setCareerImportedData(data);
+      setResumeImportedData(null);
+      selectTab("career");
+    } else {
+      setResumeImportedData(data);
+      setCareerImportedData(null);
+      selectTab("resume");
+    }
   }
 
   async function handleAiGenerate() {
@@ -1491,7 +1474,8 @@ function DocumentsPageInner() {
       setCareerDocId(doc.id);
       selectTab("career");
     }
-    setImportedData(null);
+    setResumeImportedData(null);
+    setCareerImportedData(null);
   }
 
   const currentUser = authSession?.user
@@ -1608,7 +1592,7 @@ function DocumentsPageInner() {
       {tabParam === "resume" && (
         <ResumeTab
           session={selectedSession}
-          importedData={importedData}
+          importedData={resumeImportedData}
           existingResumeData={editingResumeData}
           caProfiles={caProfiles}
           currentUser={currentUser}
@@ -1619,7 +1603,7 @@ function DocumentsPageInner() {
       {tabParam === "career" && (
         <CareerTab
           session={selectedSession}
-          importedData={importedData}
+          importedData={careerImportedData}
           existingCareerData={editingCareerData}
           caProfiles={caProfiles}
           currentUser={currentUser}
