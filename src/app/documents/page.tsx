@@ -107,8 +107,8 @@ function emptyResume(name = ""): ResumeData {
     phone: "", email: "",
     contactPostalCode: "", contactAddressKana: "", contactAddress: "",
     contactPhone: "", contactEmail: "",
-    education: [{ year: "", month: "", content: "" }],
-    workHistory: [{ year: "", month: "", content: "" }],
+    education: Array(7).fill(null).map(() => ({ year: "", month: "", content: "" })),
+    workHistory: Array(7).fill(null).map(() => ({ year: "", month: "", content: "" })),
     licenses: [{ year: "", month: "", content: "" }],
     motivation: "", commute: "", dependents: "",
     spouse: "", spouseDependency: "", wish: "",
@@ -283,9 +283,15 @@ function DocumentImportModal({
   const processFile = async (file: File) => {
     setLoading(true); setError(""); setParsed(null);
     try {
-      // Convert file to base64
-      const arrayBuffer = await file.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString("base64");
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          resolve(dataUrl.split(",")[1]);
+        };
+        reader.onerror = () => reject(new Error("ファイルの読み取りに失敗しました"));
+        reader.readAsDataURL(file);
+      });
 
       const res = await fetch("/api/documents/parse", {
         method: "POST",
@@ -293,11 +299,13 @@ function DocumentImportModal({
         body: JSON.stringify({ file: base64, mediaType: file.type, fileName: file.name }),
       });
       const json = await res.json();
-      if (json.error) { setError(json.error); return; }
-      // API now returns the parsed object directly (not wrapped in { data: ... })
+      if (json.error) {
+        setError(json.detail ? `${json.error}（${json.detail}）` : json.error);
+        return;
+      }
       setParsed(json);
-    } catch {
-      setError("読み込みに失敗しました");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
       setLoading(false);
     }
@@ -660,6 +668,23 @@ function ResumeTab({
     setTimeout(() => { document.getElementById("__resume-landscape-override__")?.remove(); }, 500);
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.querySelector(".resume-landscape") as HTMLElement;
+    if (!element) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html2pdf = (await import("html2pdf.js" as any)).default;
+    const now = new Date();
+    const date = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    const name = resume.name || "氏名";
+    html2pdf().set({
+      margin: 10,
+      filename: `履歴書_${name}_${date}.pdf`,
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "landscape" },
+    }).from(element).save();
+  };
+
   return (
     <div>
       {/* Action bar */}
@@ -671,6 +696,10 @@ function ResumeTab({
         <button onClick={handlePrint}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>
           <Printer size={14} />PDF印刷（A4横）
+        </button>
+        <button onClick={handleDownloadPDF}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>
+          <FileText size={14} />PDFダウンロード
         </button>
         <button onClick={handleSave} disabled={saving}
           style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, background: "#fff", color: "#0D2B5E", border: "1px solid #C8DFF5", cursor: "pointer" }}>

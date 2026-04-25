@@ -78,12 +78,32 @@ export async function POST(req: NextRequest) {
     let messages: Anthropic.MessageParam[];
 
     if (mediaType === 'application/pdf') {
+      const buffer = Buffer.from(file, 'base64');
+      let pdfText = '';
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdfParse = require('pdf-parse');
+        const pdfData = await pdfParse(buffer);
+        pdfText = pdfData.text;
+        if (!pdfText.trim()) {
+          return NextResponse.json(
+            { error: 'PDFからテキストを抽出できませんでした。スキャンPDFの場合は画像（jpg・png）でアップロードしてください。' },
+            { status: 422 }
+          );
+        }
+      } catch (pdfError) {
+        console.error('PDF parse error:', pdfError);
+        return NextResponse.json(
+          { error: 'PDFの解析に失敗しました。ファイルが破損していないか確認してください。', detail: String(pdfError) },
+          { status: 500 }
+        );
+      }
       messages = [
         {
           role: 'user',
           content: [
-            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file } },
-            { type: 'text', text: PARSE_PROMPT + memoText },
+            { type: 'text', text: PARSE_PROMPT },
+            { type: 'text', text: `\n\n--- 書類内容 ---\n${pdfText}${memoText}` },
           ],
         },
       ];
@@ -92,14 +112,30 @@ export async function POST(req: NextRequest) {
       fileName?.endsWith('.docx')
     ) {
       const buffer = Buffer.from(file, 'base64');
-      const mammoth = await import('mammoth');
-      const result = await mammoth.extractRawText({ buffer });
+      let wordText = '';
+      try {
+        const mammoth = await import('mammoth');
+        const result = await mammoth.extractRawText({ buffer });
+        wordText = result.value;
+        if (!wordText.trim()) {
+          return NextResponse.json(
+            { error: 'Wordファイルからテキストを抽出できませんでした。ファイルが正しい.docx形式か確認してください。' },
+            { status: 422 }
+          );
+        }
+      } catch (wordError) {
+        console.error('Word parse error:', wordError);
+        return NextResponse.json(
+          { error: 'Wordファイルの解析に失敗しました。.docx形式のファイルをアップロードしてください。', detail: String(wordError) },
+          { status: 500 }
+        );
+      }
       messages = [
         {
           role: 'user',
           content: [
             { type: 'text', text: PARSE_PROMPT },
-            { type: 'text', text: `\n\n--- 書類内容 ---\n${result.value}${memoText}` },
+            { type: 'text', text: `\n\n--- 書類内容 ---\n${wordText}${memoText}` },
           ],
         },
       ];
